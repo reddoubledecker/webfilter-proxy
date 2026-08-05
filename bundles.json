@@ -1,0 +1,16 @@
+{
+  "_comment": "Preset bypass bundles: a service -> its known content domains. Adding a bundle adds all its domains to the bypass (no-intercept) list. Plain domains match subdomains too. Best-effort; edit as sites change.",
+  "bundles": {
+    "Netflix": ["netflix.com", "nflxvideo.net", "nflximg.net", "nflxso.net", "nflxext.com"],
+    "YouTube": ["youtube.com", "youtu.be", "googlevideo.com", "ytimg.com", "ggpht.com"],
+    "Disney+": ["disneyplus.com", "disney-plus.net", "dssott.com", "bamgrid.com", "disneyplus.com.edgesuite.net"],
+    "Amazon Prime Video": ["primevideo.com", "amazonvideo.com", "aiv-cdn.net", "aiv-delivery.net", "media-amazon.com"],
+    "Hulu": ["hulu.com", "hulustream.com", "huluim.com"],
+    "Max (HBO)": ["max.com", "hbomax.com", "hbomaxcdn.com", "discomax.com"],
+    "Spotify": ["spotify.com", "scdn.co", "spotifycdn.com"],
+    "Twitch": ["twitch.tv", "ttvnw.net", "jtvnw.net"],
+    "Apple (iCloud/Media)": ["apple.com", "icloud.com", "mzstatic.com", "cdn-apple.com", "aaplimg.com"],
+    "Zoom": ["zoom.us", "zoom.com", "zoomgov.com"],
+    "Microsoft 365": ["microsoft.com", "office.com", "office365.com", "microsoftonline.com", "sharepoint.com", "outlook.com", "live.com"]
+  }
+}

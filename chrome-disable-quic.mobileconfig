@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Disables QUIC / HTTP-3 in Google Chrome so all traffic uses TCP and goes through the
+  filtering proxy. This is the reliable fix on macOS where a pf UDP-443 block doesn't
+  catch Chrome's QUIC. Install: open this file -> System Settings -> General ->
+  Device Management (Profiles) -> Install (admin password). Verify at chrome://policy
+  (QuicAllowed = false), then fully quit and reopen Chrome.
+-->
+<plist version="1.0">
+<dict>
+  <key>PayloadType</key>            <string>Configuration</string>
+  <key>PayloadVersion</key>         <integer>1</integer>
+  <key>PayloadScope</key>           <string>System</string><!-- apply to ALL users on this Mac -->
+  <key>PayloadIdentifier</key>      <string>com.familywebfilter.chrome.noquic</string>
+  <key>PayloadUUID</key>            <string>A7DB7317-6585-4E9B-8FBE-34A9B1269989</string>
+  <key>PayloadDisplayName</key>     <string>Family Web Filter - Disable Chrome QUIC</string>
+  <key>PayloadDescription</key>     <string>Turns off QUIC/HTTP-3 so Chrome traffic goes through the filtering proxy.</string>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>PayloadType</key>        <string>com.google.Chrome</string>
+      <key>PayloadVersion</key>     <integer>1</integer>
+      <key>PayloadIdentifier</key>  <string>com.familywebfilter.chrome.noquic.policy</string>
+      <key>PayloadUUID</key>        <string>B6B48B5C-CBD4-4424-8223-9D44401366D3</string>
+      <key>PayloadDisplayName</key> <string>Chrome QUIC Policy</string>
+      <key>QuicAllowed</key>        <false/>
+    </dict>
+  </array>
+</dict>
+</plist>

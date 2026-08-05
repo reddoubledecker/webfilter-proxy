@@ -1,0 +1,10 @@
+{
+  "threshold": 40,
+  "safeSearch": true,
+  "banner": true,
+  "bypassAll": false,
+  "categories": {},
+  "bypass": [],
+  "passwordHash": null,
+  "passwordSalt": null
+}

@@ -1,0 +1,17 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# mitmproxy CA + private key — NEVER commit
+mitm-ca/
+
+# runtime state / secrets (per-machine)
+config/config.json
+config/.secret
+config/learned.json
+config/suggestions.json
+config/*.log
+
+# macOS
+.DS_Store
