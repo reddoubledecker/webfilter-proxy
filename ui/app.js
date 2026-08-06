@@ -65,7 +65,22 @@ async function showApp() {
   await refreshSuggestions();
   await refreshLearned();
   await refreshLog();
+  await refreshHealth();
 }
+
+// ── Diagnostics ──────────────────────────────────────────────────────────────────
+async function refreshHealth() {
+  const r = await api('GET', '/api/health');
+  if (r && r.log) $('health-out').textContent = r.log.trim();
+}
+$('run-health').onclick = async () => {
+  $('health-msg').textContent = 'Running…';
+  $('run-health').disabled = true;
+  const r = await api('POST', '/api/health/run');
+  $('health-out').textContent = (r && r.output ? r.output.trim() : '') || 'No output.';
+  $('health-msg').textContent = '';
+  $('run-health').disabled = false;
+};
 
 // ── Detection: safesearch, threshold, categories ─────────────────────────────────
 async function refreshState() {
@@ -76,6 +91,8 @@ async function refreshState() {
   $('bypass-warning').classList.toggle('hidden', !s.bypassAll);
   $('threshold').value = String(s.threshold);
   $('summary').textContent = `${s.ruleCount} rules · ${s.keywordCount} keywords · ${s.learnedCount} learned`;
+  $('proxy-status').textContent = s.proxyUp ? '🟢 filter active' : '🔴 filter down';
+  $('filter-down-warning').classList.toggle('hidden', !s.failOpen);
   const box = $('categories'); box.innerHTML = '';
   for (const c of s.categories || []) {
     const l = document.createElement('label');

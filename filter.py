@@ -10,11 +10,13 @@ Config is hot-reloaded from config/ so the control UI's edits apply live.
 import os
 import sys
 import json
+import time
 import secrets
 import asyncio
 import logging
 import logging.handlers
 import datetime
+import traceback
 from urllib.parse import urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # so mitmdump finds our modules
@@ -37,6 +39,66 @@ if not _alog.handlers:                       # guard against duplicate handlers 
     _alog.addHandler(_ah)
 _count = 0
 
+# ── Error log (application-level filtering errors, with remediation hints) ─────────
+# The request/response hooks swallow exceptions so a filtering bug never breaks browsing,
+# but the error must not vanish silently — it lands here in plain English, with a hint on
+# what to check and how to fix it. Throttled per unique error so a hot path can't flood it.
+ERROR_LOG = os.path.join(os.path.dirname(F.ACTIVITY_LOG), "filter-errors.log")
+_elog = logging.getLogger("wf.errors")
+_elog.setLevel(logging.ERROR)
+_elog.propagate = False
+if not _elog.handlers:
+    _eh = logging.handlers.RotatingFileHandler(
+        ERROR_LOG, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
+    _eh.setFormatter(logging.Formatter("%(asctime)s  %(message)s", "%Y-%m-%d %H:%M:%S"))
+    _elog.addHandler(_eh)
+_err_seen = {}          # signature -> (last_logged_epoch, suppressed_count)
+_ERR_THROTTLE = 60      # seconds; identical errors within this window are counted, not re-logged
+
+
+def _hint(exc):
+    """Plain-English 'what to check / how to fix' for a caught exception."""
+    m = ("%s %s" % (type(exc).__name__, exc)).lower()
+    if "address already in use" in m or "errno 48" in m:
+        return "Port 8080 is taken by another process. Check: sudo lsof -nP -iTCP:8080 — kill it or reboot."
+    if "serial" in m:
+        return "The mitmproxy CA has an invalid serial. Fix: sudo /usr/local/webfilter-proxy/regenerate-ca.sh"
+    if isinstance(exc, PermissionError) or "operation not permitted" in m:
+        return "A file couldn't be read (macOS TCC/permissions). Ensure the install lives under /usr/local, not ~/Documents."
+    if isinstance(exc, (ImportError, ModuleNotFoundError)):
+        return "A Python dependency is missing. Fix: cd /usr/local/webfilter-proxy && sudo ./install.sh"
+    if isinstance(exc, (json.JSONDecodeError, ValueError)) and "json" in m:
+        return "A config/*.json file is malformed. Check config/ for the offending file; restore from config.example.json or a backup."
+    if isinstance(exc, MemoryError):
+        return "Out of memory. Check the page size / activity.log growth; restart the proxy."
+    return "Unexpected filtering error. Run ./doctor.sh; if it persists, re-deploy known-good code and check filter-errors.log."
+
+
+def _log_error(where, exc, flow=None):
+    """Log a caught error once per unique (where,type) within the throttle window, with the
+    request URL, the reason, a fix hint, and the traceback. Never raises."""
+    try:
+        sig = "%s:%s" % (where, type(exc).__name__)
+        now = time.time()
+        last, suppressed = _err_seen.get(sig, (0, 0))
+        if now - last < _ERR_THROTTLE:
+            _err_seen[sig] = (last, suppressed + 1)
+            return
+        url = ""
+        try:
+            url = flow.request.pretty_url if flow else ""
+        except Exception:
+            pass
+        extra = " (%d more suppressed in the last %ds)" % (suppressed, _ERR_THROTTLE) if suppressed else ""
+        _elog.error(
+            "in %s: %s: %s%s\n    url: %s\n    FIX: %s\n%s",
+            where, type(exc).__name__, exc, extra, url or "-", _hint(exc),
+            "    " + traceback.format_exc().replace("\n", "\n    ").rstrip())
+        _err_seen[sig] = (now, 0)
+    except Exception:
+        pass                                      # logging must never itself break the proxy
+
+
 F.prune_old_logs()
 
 
@@ -51,23 +113,32 @@ def _write(rec):
 class WebFilter:
     def __init__(self):
         self._bypass_applied = None
+        self._task = None
 
     def running(self):
         self._apply_bypass()
-        asyncio.ensure_future(self._ticker())
+        self._task = asyncio.ensure_future(self._ticker())
+
+    def done(self):
+        t = getattr(self, "_task", None)
+        if t:
+            t.cancel()                            # clean shutdown (no "Task pending" noise)
 
     async def _ticker(self):
         # Re-apply config every 2s regardless of traffic. Essential for bypass-all: once
         # everything is ignored, request hooks stop firing, so this is how the proxy notices
         # the switch being turned back OFF.
-        while True:
-            await asyncio.sleep(2)
-            try:
-                F.maybe_reload()
-                self._apply_bypass()
-                F.flush_suggestions()
-            except Exception:
-                pass
+        try:
+            while True:
+                await asyncio.sleep(2)
+                try:
+                    F.maybe_reload()
+                    self._apply_bypass()
+                    F.flush_suggestions()
+                except Exception as e:
+                    _log_error("ticker", e)
+        except asyncio.CancelledError:
+            pass
 
     @staticmethod
     def _parent_host(flow):
@@ -90,10 +161,16 @@ class WebFilter:
             try:
                 ctx.options.update(ignore_hosts=rx)
                 self._bypass_applied = rx
-            except Exception:
-                pass
+            except Exception as e:
+                _log_error("apply_bypass", e)
 
     def request(self, flow: http.HTTPFlow):
+        try:
+            self._request(flow)
+        except Exception as e:
+            _log_error("request", e, flow)        # log it, but never break browsing
+
+    def _request(self, flow: http.HTTPFlow):
         F.maybe_reload()
         self._apply_bypass()                     # re-apply if the bypass list changed
         if flow.request.host in LOCAL_HOSTS:
@@ -127,6 +204,12 @@ class WebFilter:
             flow.metadata["wf_allow"] = True
 
     def response(self, flow: http.HTTPFlow):
+        try:
+            self._response(flow)
+        except Exception as e:
+            _log_error("response", e, flow)
+
+    def _response(self, flow: http.HTTPFlow):
         if flow.request.host in LOCAL_HOSTS:
             return
         is_html = "text/html" in flow.response.headers.get("content-type", "").lower()

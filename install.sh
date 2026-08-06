@@ -14,6 +14,7 @@ CA="$CONFDIR/mitmproxy-ca-cert.pem"
 PROXY_HOST=127.0.0.1; PROXY_PORT=8080; UI_PORT=8788
 PROXY_PLIST=/Library/LaunchDaemons/com.familywebfilter.proxy.plist
 UI_PLIST=/Library/LaunchDaemons/com.familywebfilter.ui.plist
+WATCHDOG_PLIST=/Library/LaunchDaemons/com.familywebfilter.watchdog.plist
 
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo:  sudo $0" >&2; exit 1; }
 
@@ -61,6 +62,7 @@ cat > "$PROXY_PLIST" <<PLIST
   </array>
   <key>WorkingDirectory</key><string>$DIR</string>
   <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
   <key>StandardOutPath</key><string>$DIR/config/proxy.out.log</string>
   <key>StandardErrorPath</key><string>$DIR/config/proxy.err.log</string>
 </dict></plist>
@@ -81,10 +83,26 @@ cat > "$UI_PLIST" <<PLIST
 </dict></plist>
 PLIST
 
-launchctl unload "$PROXY_PLIST" 2>/dev/null || true
-launchctl unload "$UI_PLIST" 2>/dev/null || true
-launchctl load -w "$PROXY_PLIST"
-launchctl load -w "$UI_PLIST"
+cat > "$WATCHDOG_PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.familywebfilter.watchdog</string>
+  <key>ProgramArguments</key><array>
+    <string>/bin/bash</string><string>$DIR/watchdog.sh</string>
+  </array>
+  <key>WorkingDirectory</key><string>$DIR</string>
+  <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>60</integer>
+  <key>StandardOutPath</key><string>$DIR/config/watchdog.out.log</string>
+  <key>StandardErrorPath</key><string>$DIR/config/watchdog.err.log</string>
+</dict></plist>
+PLIST
+
+for pl in "$PROXY_PLIST" "$UI_PLIST" "$WATCHDOG_PLIST"; do
+  launchctl unload "$pl" 2>/dev/null || true
+  launchctl load -w "$pl"
+done
 
 echo "[5/7] Pointing the system proxy at 127.0.0.1:$PROXY_PORT..."
 while IFS= read -r svc; do
