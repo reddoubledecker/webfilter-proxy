@@ -77,6 +77,7 @@ tr.group-row td { background: var(--bg); font-weight: 700; font-size: 12px; colo
 .logs-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 16px; margin-top: 8px; }
 .cat-grid label { font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.diag { white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: var(--code-bg); color: var(--code-text); padding: 12px; border-radius: 8px; max-height: 360px; overflow: auto; }
 .kw-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .kw-list.blurred { filter: blur(6px); pointer-events: none; user-select: none; }
 .kw-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--code-bg); color: var(--code-text); border: 1px solid var(--border); padding: 3px 6px 3px 10px; border-radius: 999px; font-size: 12px; font-family: ui-monospace, Menlo, monospace; }

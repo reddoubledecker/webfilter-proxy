@@ -6,13 +6,17 @@ set -uo pipefail
 
 PROXY_PLIST=/Library/LaunchDaemons/com.familywebfilter.proxy.plist
 UI_PLIST=/Library/LaunchDaemons/com.familywebfilter.ui.plist
+WATCHDOG_PLIST=/Library/LaunchDaemons/com.familywebfilter.watchdog.plist
 
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo:  sudo $0" >&2; exit 1; }
 
 echo "Stopping LaunchDaemons..."
-launchctl unload -w "$PROXY_PLIST" 2>/dev/null || true
-launchctl unload -w "$UI_PLIST" 2>/dev/null || true
-rm -f "$PROXY_PLIST" "$UI_PLIST"
+# Watchdog first, so it can't re-enable the proxy after we unset it below.
+for pl in "$WATCHDOG_PLIST" "$PROXY_PLIST" "$UI_PLIST"; do
+  launchctl unload -w "$pl" 2>/dev/null || true
+  rm -f "$pl"
+done
+rm -f /usr/local/webfilter-proxy/config/watchdog.failopen /usr/local/webfilter-proxy/config/watchdog.fails 2>/dev/null || true
 
 echo "Unsetting system proxy..."
 while IFS= read -r svc; do

@@ -11,6 +11,7 @@ import csv
 import json
 import functools
 import secrets
+import subprocess
 
 from flask import Flask, request, session, jsonify, send_from_directory, Response
 
@@ -88,7 +89,8 @@ def state():
             for c in C.CATEGORIES]
     return jsonify(ok=True, hasPassword=F.has_password(), authed=authed(),
                    threshold=F.threshold(), safeSearch=F.safe_search_enabled(),
-                   banner=F.banner_enabled(), bypassAll=F.bypass_all(), categories=cats,
+                   banner=F.banner_enabled(), bypassAll=F.bypass_all(),
+                   proxyUp=F.proxy_listening(), failOpen=F.is_failopen(), categories=cats,
                    ruleCount=len(F.RULES), keywordCount=len(F.KEYWORDS), learnedCount=len(F.LEARNED))
 
 # ── export / import config ───────────────────────────────────────────────────────
@@ -323,6 +325,29 @@ def set_bypassall():
         return jsonify(ok=False, error="Incorrect password"), 401
     F.save_config({"bypassAll": enabled})
     return jsonify(ok=True)
+
+
+# ── health / diagnostics ─────────────────────────────────────────────────────────
+@app.get("/api/health")
+@require
+def health():
+    log = ""
+    try:
+        with open(os.path.join(HERE, "config", "health.log"), encoding="utf-8") as f:
+            log = f.read()[-8000:]
+    except OSError:
+        pass
+    return jsonify(ok=True, proxyUp=F.proxy_listening(), failOpen=F.is_failopen(), log=log)
+
+@app.post("/api/health/run")
+@require
+def health_run():
+    try:
+        out = subprocess.run(["/bin/bash", os.path.join(HERE, "doctor.sh")],
+                             capture_output=True, text=True, timeout=30).stdout
+    except Exception as e:
+        out = "Failed to run health check: %s" % e
+    return jsonify(ok=True, output=out)
 
 
 @app.post("/api/log/clear")

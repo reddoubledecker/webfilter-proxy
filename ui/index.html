@@ -31,6 +31,9 @@
 
   <!-- App -->
   <div id="app" class="hidden">
+    <div id="filter-down-warning" class="bypass-warning hidden" style="background:#dc2626">
+      ⚠️ <b>Filter is DOWN</b> — internet is temporarily UNFILTERED. It will re-lock automatically when the filter recovers.
+    </div>
     <div id="bypass-warning" class="bypass-warning hidden">
       ⚠️ <b>Bypass all is ON</b> — no filtering or interception; all traffic is passing through untouched.
       <button class="ghost small" id="bypass-off">Turn filtering back on</button>
@@ -38,6 +41,7 @@
     <header>
       <h1>🛡️ Family Web Filter</h1>
       <div class="header-right">
+        <span id="proxy-status" class="muted"></span>
         <span id="summary" class="muted"></span>
         <button class="ghost small" id="theme-btn" title="Toggle dark mode">🌙</button>
         <button class="ghost small" id="lock-btn">Lock</button>
@@ -153,6 +157,13 @@
           <span class="muted" id="log-page">Page 1</span>
           <button class="ghost small" id="log-next">Next ›</button>
         </div>
+      </section>
+
+      <section class="card">
+        <h2>Diagnostics</h2>
+        <p class="muted">Run a health check — it shows what's wrong and how to fix it. The watchdog also writes a diagnosis here automatically whenever the proxy goes down.</p>
+        <div class="add-row"><button class="ghost small" id="run-health">Run health check</button><span id="health-msg" class="muted"></span></div>
+        <pre id="health-out" class="diag"></pre>
       </section>
 
       <section class="card">

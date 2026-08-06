@@ -114,6 +114,45 @@ generated into `mitm-ca/` and trusted in the System keychain so HTTPS can be ins
 **Replicate settings across Macs:** in the UI, **Export** your config and **Import** it on the
 next machine (rules, keywords, categories, Safe Search, bypass — the password is not included).
 
+## Resilience & self-repair
+
+A dead proxy with the system proxy still set = no internet, so the service is built to
+heal itself:
+- **Watchdog daemon** (`watchdog.sh`, runs every 60s): checks the proxy is actually
+  listening (as root, no false negatives), restarts it if it's down, and keeps the control
+  UI up too.
+- **Fail-open after 3 minutes**: if the proxy can't be revived within ~3 min, the watchdog
+  **restores unfiltered internet** and posts a desktop alert — so a crash never bricks the
+  Mac — then **re-locks automatically** the moment the proxy recovers.
+- **Hardened daemons**: `KeepAlive` + `ThrottleInterval` so launchd restarts on crash.
+- **Defensive proxy**: a filtering bug fails open *per request* instead of breaking the page,
+  and the background task shuts down cleanly.
+- **Status in the UI**: the header shows 🟢/🔴 filter status, and a red banner appears while
+  fail-open is active. `chrome://policy`-style transparency instead of a silent outage.
+- **CA maintenance**: `sudo ./regenerate-ca.sh` rebuilds the mitmproxy CA with a fresh serial
+  (fixes the `non-positive serial number` deprecation before a future `cryptography` upgrade
+  turns it into a hard crash) and re-trusts it.
+
+If the proxy is ever down and you need internet *now*: `sudo networksetup -setsecurewebproxystate "Wi-Fi" off`
+(and `-setwebproxystate` off). The watchdog re-enables it when the proxy is healthy.
+
+## Diagnosing problems
+
+When something breaks, you get **plain-English errors with a fix**, not raw tracebacks:
+
+- **`sudo ./doctor.sh`** — one-command health check. Verifies the venv, dependencies, both
+  daemons, the proxy/UI ports, the system-proxy setting, the CA trust, Chrome QUIC, fail-open
+  state, config permissions, and recent errors. Every failure prints a `->` line with the exact
+  command to fix it. Also runnable from the UI: **Diagnostics → Run health check**.
+- **`config/filter-errors.log`** — any error caught inside the proxy's request/response hooks is
+  logged here (throttled per unique error) with the request URL, the reason, a `FIX:` hint, and
+  the traceback — instead of being silently swallowed. A filtering bug still fails open per
+  request, but it no longer disappears without a trace.
+- **`config/health.log`** — the watchdog runs `doctor.sh` automatically at the start of any
+  outage and appends the diagnosis here, so there's always a fresh "what's wrong / how to fix"
+  report even for a failure you weren't watching. The UI's Diagnostics panel shows its tail.
+- **`config/watchdog.log`** — a timestamped record of every restart, fail-open, and re-lock.
+
 ## Known limits (MITM realities)
 - **It decrypts all HTTPS.** Guard the CA key in `mitm-ca/`; keep it off shared locations.
 - **Certificate pinning** — some sites/native apps pin certs and fail through the proxy. Add

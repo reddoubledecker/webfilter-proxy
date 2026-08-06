@@ -157,6 +157,22 @@ def bypass_all():
     """Testing switch: when on, pass everything through (no blocking/SafeSearch), still logs."""
     return bool(CONFIG.get("bypassAll", False))
 
+def is_failopen():
+    """True if the watchdog has failed open (proxy down long enough to restore internet)."""
+    return os.path.exists(os.path.join(CONFIG_DIR, "watchdog.failopen"))
+
+def proxy_listening(port=8080):
+    import socket
+    s = socket.socket()
+    s.settimeout(0.5)
+    try:
+        s.connect(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
 def category_enabled(cid):
     return (CONFIG.get("categories") or {}).get(cid, True)   # default on
 
