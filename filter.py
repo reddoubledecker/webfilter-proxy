@@ -62,11 +62,11 @@ def _hint(exc):
     if "address already in use" in m or "errno 48" in m:
         return "Port 8080 is taken by another process. Check: sudo lsof -nP -iTCP:8080 — kill it or reboot."
     if "serial" in m:
-        return "The mitmproxy CA has an invalid serial. Fix: sudo /usr/local/webfilter-proxy/regenerate-ca.sh"
+        return "The mitmproxy CA has an invalid serial. Fix: run ./regenerate-ca.sh from the install directory (as root)."
     if isinstance(exc, PermissionError) or "operation not permitted" in m:
-        return "A file couldn't be read (macOS TCC/permissions). Ensure the install lives under /usr/local, not ~/Documents."
+        return "A file couldn't be read (macOS TCC/permissions). Check the install directory is readable by root and the daemons run as root."
     if isinstance(exc, (ImportError, ModuleNotFoundError)):
-        return "A Python dependency is missing. Fix: cd /usr/local/webfilter-proxy && sudo ./install.sh"
+        return "A Python dependency is missing. Fix: re-run ./install.sh from the install directory (as root)."
     if isinstance(exc, (json.JSONDecodeError, ValueError)) and "json" in m:
         return "A config/*.json file is malformed. Check config/ for the offending file; restore from config.example.json or a backup."
     if isinstance(exc, MemoryError):

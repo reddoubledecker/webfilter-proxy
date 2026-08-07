@@ -1,14 +1,16 @@
 # Family Web Filter — proxy edition
 
-A system-wide filtering **proxy** with a local **control UI**. It enforces the same policy
-as the browser extension — URL rules, keyword (URL + page content), category scoring,
-SafeSearch — across **every browser and app**, with a real blocked page. Runs **unsigned**
-(no Apple Developer account): it's just Python processes managed by LaunchDaemons.
+A system-wide filtering **proxy** with a local **control UI**. It enforces URL rules,
+keyword matching (URL + page content), category scoring, and SafeSearch across **every
+browser and app**, with a real blocked page. Runs **unsigned** (no Apple Developer
+account): it's just Python processes managed by LaunchDaemons.
 
 ## Install (macOS)
 
 ```bash
-cd /Users/waihon/Documents/Project1/webfilter-proxy
+git clone https://github.com/reddoubledecker/webfilter-proxy.git
+sudo cp -R webfilter-proxy /usr/local/webfilter-proxy   # install outside the user home so root can read it
+cd /usr/local/webfilter-proxy
 sudo ./install.sh    # venv+deps, trusts CA, installs daemons, sets the proxy, opens the QUIC profile
 ```
 
@@ -29,7 +31,7 @@ profile in System Settings if you want QUIC back).
 
 ## Updating
 
-The running copy lives at `/usr/local/webfilter-proxy` (outside `~/Documents`, which
+The running copy lives at `/usr/local/webfilter-proxy` (outside the user home folder, which
 macOS blocks root services from reading). After editing the source, deploy in one step:
 
 ```bash

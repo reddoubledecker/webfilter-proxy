@@ -30,9 +30,9 @@ classify_proxy_error() {   # reads the tail of proxy.err.log and suggests the li
     *"serial number which wasn't positive"*|*"serial number"*)
       echo "The mitmproxy CA has an invalid serial (newer 'cryptography' rejects it). Fix: sudo ./regenerate-ca.sh";;
     *"Operation not permitted"*|*"pyvenv.cfg"*)
-      echo "Root can't read the install dir (macOS TCC). Is it under ~/Documents? Fix: reinstall under /usr/local.";;
+      echo "Root can't read the install dir (macOS TCC/permissions). Fix: ensure the install directory is readable by root.";;
     *"ModuleNotFoundError"*|*"No module named"*)
-      echo "A Python dependency/venv is broken. Fix: cd $DIR && sudo ./install.sh (rebuilds the venv).";;
+      echo "A Python dependency/venv is broken. Fix: re-run ./install.sh from the install directory (rebuilds the venv).";;
     *"SyntaxError"*|*"IndentationError"*)
       echo "A code error in a .py file. Fix: check the traceback in proxy.err.log; re-deploy known-good code.";;
     *Traceback*|*Error*)
