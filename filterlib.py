@@ -92,7 +92,7 @@ reload_config()
 for _p in (RULES_PATH, KEYWORDS_PATH, CONFIG_PATH, LEARNED_PATH):
     _mtimes[_p] = _mtime(_p)
 
-# ── Pattern matching (ported from the extension) ─────────────────────────────────
+# ── Pattern matching ─────────────────────────────────────────────────────────────
 
 def matches(url, pattern):
     p = re.sub(r"^https?://", "", pattern.strip().lower())

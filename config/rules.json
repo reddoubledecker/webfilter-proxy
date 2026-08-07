@@ -1,5 +1,5 @@
 {
-  "_comment": "Block/allow URL rules. Most-specific pattern wins; on a tie, Allow wins. Same wildcard syntax as the extension: plain domain (+subdomains), *.domain.com, domain.*, or *wildcard*.",
+  "_comment": "Block/allow URL rules. Most-specific pattern wins; on a tie, Allow wins. Wildcard syntax: plain domain (+subdomains), *.domain.com, domain.*, or *wildcard*.",
   "rules": [
     { "type": "allow", "pattern": "google.com" },
     { "type": "block", "pattern": "chromewebstore.google.com" },

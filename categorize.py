@@ -1,6 +1,6 @@
-"""On-device content categorizer — Python port of the extension's categorize.js.
+"""On-device content categorizer.
 Extracts signals from raw HTML (the proxy sees the decrypted body) and scores them into
-categories. Same lexicons, weights and caps as the extension."""
+categories, using weighted lexicons with per-category caps."""
 import re
 
 CATEGORIES = [
@@ -91,7 +91,7 @@ def extract_signals(html, url=""):
         "iframeSrcs": [s.lower() for s in re.findall(r'<iframe\b[^>]+src=["\'](.*?)["\']', html, re.I)][:100],
     }
 
-# ── Scoring (mirrors categorize.js) ──────────────────────────────────────────────
+# ── Scoring ──────────────────────────────────────────────────────────────────────
 
 def _count_distinct(hay, needles):
     return sum(1 for w in needles if w in hay)
