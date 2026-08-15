@@ -9,6 +9,7 @@ import re
 import io
 import csv
 import json
+import time
 import functools
 import secrets
 import subprocess
@@ -22,6 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 UI_DIR = os.path.join(HERE, "ui")
 SECRET_PATH = os.path.join(HERE, "config", ".secret")
 PORT = 8788
+IDLE_TIMEOUT = 60           # seconds of inactivity before the session auto-locks
 
 
 def _secret():
@@ -58,6 +60,19 @@ def require(fn):
     return wrapper
 
 
+@app.before_request
+def _idle_guard():
+    """Enforce the idle timeout server-side so it can't be bypassed by disabling JS.
+    Any non-GET request (a user action or the client heartbeat) counts as activity and
+    refreshes the clock; a session left idle past the timeout is cleared -> locked."""
+    if session.get("auth"):
+        now = time.time()
+        if now - session.get("last", now) > IDLE_TIMEOUT:
+            session.clear()
+        elif request.method != "GET":
+            session["last"] = now
+
+
 # ── static UI ────────────────────────────────────────────────────────────────────
 @app.get("/")
 def index():
@@ -73,12 +88,20 @@ def static_files(p):
 def login():
     if F.verify_password((request.json or {}).get("password", "")):
         session["auth"] = True
+        session["last"] = time.time()
         return jsonify(ok=True)
     return jsonify(ok=False, error="Incorrect password"), 401
 
 @app.post("/api/logout")
 def logout():
     session.clear()
+    return jsonify(ok=True)
+
+@app.post("/api/heartbeat")
+@require
+def heartbeat():
+    # The before_request hook refreshes the idle clock for this (non-GET) request; this
+    # just tells the client the session is still valid (or returns 401 once it's locked).
     return jsonify(ok=True)
 
 @app.get("/api/state")
@@ -120,6 +143,7 @@ def password():
         return jsonify(ok=False, error="Password must be at least 4 characters"), 400
     F.set_password(nxt)
     session["auth"] = True
+    session["last"] = time.time()
     return jsonify(ok=True)
 
 

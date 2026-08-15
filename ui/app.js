@@ -52,11 +52,44 @@ $('login-btn').onclick = async () => {
   if (r.ok) { $('login-pw').value = ''; showApp(); } else $('login-err').textContent = r.error || 'Failed.';
 };
 $('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-btn').click(); });
-$('lock-btn').onclick = async () => { await api('POST', '/api/logout'); showGate('login'); };
+// ── Auto-lock: 1 min idle, and on closing the page ────────────────────────────────
+const IDLE_MS = 60000;         // lock after 1 minute with no interaction
+const HEARTBEAT_MS = 20000;    // while active, keep the server session alive (< idle timeout)
+let idleTimer = null, lastBeat = 0, sessionActive = false;
+
+async function lock(reason) {
+  if (!sessionActive) return;
+  sessionActive = false;
+  clearTimeout(idleTimer);
+  try { await api('POST', '/api/logout'); } catch (_) {}
+  showGate('login');
+  $('login-err').textContent = reason || '';
+}
+
+function bumpIdle() {
+  if (!sessionActive) return;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => lock('Locked after 1 minute of inactivity.'), IDLE_MS);
+  const now = Date.now();
+  if (now - lastBeat > HEARTBEAT_MS) {          // let the server know we're still here
+    lastBeat = now;
+    api('POST', '/api/heartbeat').then(r => { if (r && r.ok === false) lock('Session expired.'); });
+  }
+}
+
+function startSession() { sessionActive = true; lastBeat = Date.now(); bumpIdle(); }
+
+['mousemove', 'mousedown', 'keydown', 'scroll', 'wheel', 'touchstart'].forEach(
+  ev => window.addEventListener(ev, bumpIdle, { passive: true }));
+// Lock immediately when the page is closed / navigated away / refreshed.
+window.addEventListener('pagehide', () => { if (sessionActive) navigator.sendBeacon('/api/logout'); });
+
+$('lock-btn').onclick = () => lock();
 
 async function showApp() {
   $('gate').classList.add('hidden');
   $('app').classList.remove('hidden');
+  startSession();                 // begin the idle-lock timer + heartbeats
   await refreshState();
   await refreshRules();
   await refreshKeywords();
