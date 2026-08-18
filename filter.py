@@ -203,6 +203,21 @@ class WebFilter:
         if status == "allow":
             flow.metadata["wf_allow"] = True
 
+    def responseheaders(self, flow: http.HTTPFlow):
+        # Runs as soon as the response headers arrive, before the body is downloaded.
+        # Stream (pass straight through, unbuffered) everything we don't scan — i.e. anything
+        # that isn't HTML: images, video, fonts, JS/CSS bundles, downloads. The browser then
+        # gets those bytes as they arrive instead of waiting for the proxy to buffer the whole
+        # file. HTML stays buffered so we can still scan content and inject the banner.
+        try:
+            if flow.metadata.get("wf_blocked"):
+                return
+            ct = flow.response.headers.get("content-type", "").lower()
+            if "text/html" not in ct:
+                flow.response.stream = True
+        except Exception as e:
+            _log_error("responseheaders", e, flow)
+
     def response(self, flow: http.HTTPFlow):
         try:
             self._response(flow)
