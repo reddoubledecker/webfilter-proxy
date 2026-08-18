@@ -222,6 +222,19 @@
         <!-- Settings -->
         <div class="pane hidden" id="pane-settings">
           <section class="card">
+            <h2>Emergency bypass</h2>
+            <p class="muted">If the filter is broken and you just need internet to work, this turns filtering <b>off</b> — it stops the watchdog and unsets the system proxy so all traffic flows directly (no MITM). Re-enable once the problem is fixed.</p>
+            <div class="add-row" id="emg-idle">
+              <button class="ghost small danger" id="emergency-off-btn">Restore unfiltered internet</button>
+              <span id="emergency-msg" class="muted"></span>
+            </div>
+            <div class="add-row hidden" id="emg-active">
+              <span style="color:#dc2626;font-weight:600;font-size:13px">⚠️ Filtering is OFF (emergency bypass active).</span>
+              <button class="primary small" id="emergency-restore-btn">Re-enable filtering</button>
+            </div>
+          </section>
+
+          <section class="card">
             <h2>Backup / transfer</h2>
             <p class="muted">Export your rules, keywords, categories, Safe Search, and bypass list to a file, then import it on another machine. The password is <b>not</b> included.</p>
             <div class="add-row">

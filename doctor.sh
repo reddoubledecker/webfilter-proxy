@@ -123,6 +123,12 @@ report() {
       "The proxy is down; it re-locks automatically when the proxy recovers. Fix the proxy (see above)."
   fi
 
+  # Emergency bypass
+  if [ -f "$DIR/config/emergency" ]; then
+    warn "Emergency bypass is ACTIVE - filtering is OFF and the watchdog is stopped" \
+      "Re-enable when fixed: sudo ./restore-filtering.sh (or the UI Settings > Emergency button)"
+  fi
+
   # config.json perms
   if [ -f "$DIR/config/config.json" ]; then
     m=$(stat -f%p "$DIR/config/config.json" 2>/dev/null | tail -c 4)

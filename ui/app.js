@@ -168,10 +168,15 @@ async function refreshState() {
   $('bypass-all').checked = s.bypassAll;
   $('bypass-warning').classList.toggle('hidden', !s.bypassAll);
   $('threshold').value = String(s.threshold);
-  $('proxy-status').textContent = s.proxyUp ? '🟢 filter active' : '🔴 filter down';
+  $('proxy-status').textContent = s.emergency ? '🟠 filtering OFF (emergency)'
+    : (s.proxyUp ? '🟢 filter active' : '🔴 filter down');
   $('filter-down-warning').classList.toggle('hidden', !s.failOpen);
+  if ($('emg-idle')) {                            // emergency-bypass buttons
+    $('emg-idle').classList.toggle('hidden', s.emergency);
+    $('emg-active').classList.toggle('hidden', !s.emergency);
+  }
   if ($('dash-proxy')) {                          // dashboard stat cards
-    $('dash-proxy').textContent = s.proxyUp ? '🟢 Active' : '🔴 Down';
+    $('dash-proxy').textContent = s.emergency ? '🟠 OFF' : (s.proxyUp ? '🟢 Active' : '🔴 Down');
     $('dash-rules').textContent = s.ruleCount;
     $('dash-keywords').textContent = s.keywordCount;
     $('dash-learned').textContent = s.learnedCount;
@@ -194,6 +199,27 @@ $('bypass-all').onchange = async e => {
   } else {
     await api('POST', '/api/bypassall', { enabled: false });
   }
+  refreshState();
+};
+
+// ── Emergency bypass (kill switch) ────────────────────────────────────────────────
+$('emergency-off-btn').onclick = async () => {
+  if (!confirm('Turn OFF all filtering now?\n\nThis stops the watchdog and unsets the system proxy so browsing works unfiltered until you re-enable it.')) return;
+  const pw = await askPassword('Enter your password to turn filtering OFF (emergency)');
+  if (pw == null) return;
+  $('emergency-msg').textContent = 'Working…';
+  const r = await api('POST', '/api/bypass/emergency', { password: pw });
+  $('emergency-msg').textContent = '';
+  if (!r.ok) return alert(r.error || 'Failed.');
+  refreshState();
+};
+$('emergency-restore-btn').onclick = async () => {
+  const pw = await askPassword('Enter your password to re-enable filtering');
+  if (pw == null) return;
+  $('emergency-msg').textContent = 'Working…';
+  const r = await api('POST', '/api/bypass/restore', { password: pw });
+  $('emergency-msg').textContent = '';
+  if (!r.ok) return alert(r.error || 'Failed.');
   refreshState();
 };
 $('bypass-off').onclick = async () => { await api('POST', '/api/bypassall', { enabled: false }); refreshState(); };

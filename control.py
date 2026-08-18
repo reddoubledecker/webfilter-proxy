@@ -22,6 +22,7 @@ import categorize as C
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI_DIR = os.path.join(HERE, "ui")
 SECRET_PATH = os.path.join(HERE, "config", ".secret")
+EMERGENCY_MARKER = os.path.join(HERE, "config", "emergency")
 PORT = 8788
 IDLE_TIMEOUT = 60           # seconds of inactivity before the session auto-locks
 
@@ -113,7 +114,8 @@ def state():
     return jsonify(ok=True, hasPassword=F.has_password(), authed=authed(),
                    threshold=F.threshold(), safeSearch=F.safe_search_enabled(),
                    banner=F.banner_enabled(), bypassAll=F.bypass_all(),
-                   proxyUp=F.proxy_listening(), failOpen=F.is_failopen(), categories=cats,
+                   proxyUp=F.proxy_listening(), failOpen=F.is_failopen(),
+                   emergency=os.path.exists(EMERGENCY_MARKER), categories=cats,
                    ruleCount=len(F.RULES), keywordCount=len(F.KEYWORDS), learnedCount=len(F.LEARNED))
 
 # ── export / import config ───────────────────────────────────────────────────────
@@ -349,6 +351,32 @@ def set_bypassall():
         return jsonify(ok=False, error="Incorrect password"), 401
     F.save_config({"bypassAll": enabled})
     return jsonify(ok=True)
+
+
+# ── emergency bypass (kill switch: stop watchdog + unset the system proxy) ─────────
+def _run_script(name):
+    try:
+        p = subprocess.run(["/bin/bash", os.path.join(HERE, name)],
+                           capture_output=True, text=True, timeout=60)
+        return p.returncode == 0, (p.stdout or "") + (p.stderr or "")
+    except Exception as e:
+        return False, "Failed to run %s: %s" % (name, e)
+
+@app.post("/api/bypass/emergency")
+@require
+def bypass_emergency():
+    if F.has_password() and not F.verify_password((request.json or {}).get("password", "")):
+        return jsonify(ok=False, error="Incorrect password"), 401
+    ok, out = _run_script("emergency-off.sh")
+    return jsonify(ok=ok, output=out, error=None if ok else "Emergency bypass failed")
+
+@app.post("/api/bypass/restore")
+@require
+def bypass_restore():
+    if F.has_password() and not F.verify_password((request.json or {}).get("password", "")):
+        return jsonify(ok=False, error="Incorrect password"), 401
+    ok, out = _run_script("restore-filtering.sh")
+    return jsonify(ok=ok, output=out, error=None if ok else "Restore failed")
 
 
 # ── health / diagnostics ─────────────────────────────────────────────────────────
