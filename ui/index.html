@@ -60,17 +60,30 @@
       <main>
         <!-- Dashboard -->
         <div class="pane" id="pane-dashboard">
+          <div class="logs-head" style="margin-bottom:14px">
+            <h2 style="font-size:15px">Overview</h2>
+            <button class="ghost small" id="dash-refresh">Refresh</button>
+          </div>
           <div class="stat-grid">
             <div class="stat"><div class="stat-label">Filter</div><div class="stat-value" id="dash-proxy">—</div></div>
-            <div class="stat"><div class="stat-label">URL rules</div><div class="stat-value" id="dash-rules">—</div></div>
-            <div class="stat"><div class="stat-label">Keywords</div><div class="stat-value" id="dash-keywords">—</div></div>
-            <div class="stat"><div class="stat-label">Auto-detected</div><div class="stat-value" id="dash-learned">—</div></div>
+            <div class="stat"><div class="stat-label">Blocked (24h)</div><div class="stat-value" id="dash-blocked24">—</div></div>
+            <div class="stat"><div class="stat-label">Requests (24h)</div><div class="stat-value" id="dash-reqs24">—</div></div>
+            <div class="stat"><div class="stat-label">Searches (24h)</div><div class="stat-value" id="dash-searches24">—</div></div>
           </div>
-          <section class="card">
-            <div class="logs-head"><h2>Recent activity</h2><button class="ghost small" id="dash-refresh">Refresh</button></div>
-            <table><thead><tr><th>Time</th><th>Action</th><th>URL</th></tr></thead><tbody id="dash-log-body"></tbody></table>
-            <p id="dash-log-empty" class="muted hidden">No activity yet.</p>
-            <p class="muted">See the full log in <b>Activity</b>.</p>
+          <div class="summary-grid">
+            <section class="card">
+              <div class="logs-head"><h2>Top blocked sites</h2><span class="muted">last 7 days</span></div>
+              <table><tbody id="dash-top-domains"></tbody></table>
+              <p id="dash-domains-empty" class="muted hidden">Nothing blocked yet.</p>
+            </section>
+            <section class="card">
+              <div class="logs-head"><h2>Top block reasons</h2><span class="muted">last 7 days</span></div>
+              <table><tbody id="dash-top-reasons"></tbody></table>
+              <p id="dash-reasons-empty" class="muted hidden">Nothing blocked yet.</p>
+            </section>
+          </div>
+          <section class="card subtle">
+            <p class="muted" id="dash-inventory">—</p>
           </section>
         </div>
 

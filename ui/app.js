@@ -127,20 +127,29 @@ $('filtering-subtabs').addEventListener('click', e => {
   const b = e.target.closest('.subtab'); if (b) showSub(b.dataset.sub);
 });
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────────
+// ── Dashboard (status + aggregate summary, not a feed) ────────────────────────────
 async function refreshDashboard() {
-  await refreshState();                          // header status + stat numbers
-  const r = await api('GET', '/api/log?per_page=10&page=0&kind=activity');
-  const body = $('dash-log-body'); if (!body) return;
-  const rows = (r && r.log) || [];
+  await refreshState();                          // header status + Filter stat card
+  const r = await api('GET', '/api/summary');
+  if (!r || !r.ok) return;
+  $('dash-blocked24').textContent = r.blocked24;
+  $('dash-reqs24').textContent = r.reqs24;
+  $('dash-searches24').textContent = r.searches24;
+  fillTop('dash-top-domains', 'dash-domains-empty', r.topDomains);
+  fillTop('dash-top-reasons', 'dash-reasons-empty', r.topReasons);
+  $('dash-inventory').textContent =
+    `${r.ruleCount} rules · ${r.keywordCount} keywords · ${r.categoriesOn} categories on · ` +
+    `${r.bypassCount} bypassed · ${r.learnedCount} auto-detected`;
+}
+function fillTop(bodyId, emptyId, items) {
+  const body = $(bodyId); if (!body) return;
+  items = items || [];
   body.innerHTML = '';
-  $('dash-log-empty').classList.toggle('hidden', rows.length > 0);
-  for (const e of rows) {
+  $(emptyId).classList.toggle('hidden', items.length > 0);
+  for (const it of items) {
     const tr = document.createElement('tr');
-    const act = e.action === 'blocked'
-      ? '<span class="tag block">blocked</span>' : '<span class="tag allow">allowed</span>';
-    tr.innerHTML = `<td>${esc((e.t || '').replace('T', ' '))}</td><td>${act}</td>` +
-      `<td class="url">${esc(e.url || e.host || '')}</td>`;
+    tr.innerHTML = `<td class="url">${esc(it.name)}</td>` +
+      `<td style="text-align:right;font-weight:600;width:60px">${it.count}</td>`;
     body.appendChild(tr);
   }
 }
@@ -175,11 +184,8 @@ async function refreshState() {
     $('emg-idle').classList.toggle('hidden', s.emergency);
     $('emg-active').classList.toggle('hidden', !s.emergency);
   }
-  if ($('dash-proxy')) {                          // dashboard stat cards
+  if ($('dash-proxy')) {                          // dashboard Filter stat card
     $('dash-proxy').textContent = s.emergency ? '🟠 OFF' : (s.proxyUp ? '🟢 Active' : '🔴 Down');
-    $('dash-rules').textContent = s.ruleCount;
-    $('dash-keywords').textContent = s.keywordCount;
-    $('dash-learned').textContent = s.learnedCount;
   }
   const box = $('categories'); box.innerHTML = '';
   for (const c of s.categories || []) {

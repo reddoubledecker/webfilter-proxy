@@ -10,9 +10,11 @@ import io
 import csv
 import json
 import time
+import datetime
 import functools
 import secrets
 import subprocess
+from collections import Counter
 
 from flask import Flask, request, session, jsonify, send_from_directory, Response
 
@@ -117,6 +119,36 @@ def state():
                    proxyUp=F.proxy_listening(), failOpen=F.is_failopen(),
                    emergency=os.path.exists(EMERGENCY_MARKER), categories=cats,
                    ruleCount=len(F.RULES), keywordCount=len(F.KEYWORDS), learnedCount=len(F.LEARNED))
+
+@app.get("/api/summary")
+@require
+def summary():
+    """Aggregate stats for the dashboard: last-24h counts + top blocked over 7 days."""
+    cutoff = (datetime.datetime.now() - datetime.timedelta(hours=24)).isoformat()
+    reqs = blocked = searches = 0
+    for e in F.read_activity(limit=100000, days=1, kind="all", max_scan=120000):
+        if (e.get("t") or "") < cutoff:
+            continue
+        reqs += 1
+        if e.get("action") == "blocked":
+            blocked += 1
+        if e.get("query"):
+            searches += 1
+
+    dom, rsn = Counter(), Counter()
+    for e in F.read_activity(limit=100000, days=7, kind="blocked", max_scan=200000):
+        if e.get("host"):
+            dom[e["host"]] += 1
+        r = (e.get("reason") or "").strip()
+        if r:
+            rsn[r] += 1
+    top = lambda c: [{"name": k, "count": v} for k, v in c.most_common(5)]
+
+    return jsonify(ok=True, reqs24=reqs, blocked24=blocked, searches24=searches,
+                   topDomains=top(dom), topReasons=top(rsn),
+                   ruleCount=len(F.RULES), keywordCount=len(F.KEYWORDS),
+                   categoriesOn=sum(1 for c in C.CATEGORIES if F.category_enabled(c["id"])),
+                   bypassCount=len(F.bypass_entries()), learnedCount=len(F.LEARNED))
 
 # ── export / import config ───────────────────────────────────────────────────────
 @app.get("/api/export")
