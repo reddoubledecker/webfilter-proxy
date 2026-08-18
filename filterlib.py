@@ -566,7 +566,8 @@ def read_activity(limit=500, days=RETAIN_DAYS, q="", kind="activity", max_scan=4
             if kind == "activity" and not (rec.get("query") or rec.get("dest") == "document"
                                            or rec.get("action") == "blocked"):
                 continue
-            if ql and ql not in (rec.get("url", "") + " " + rec.get("query", "") + " " + rec.get("host", "")).lower():
+            if ql and ql not in (rec.get("url", "") + " " + rec.get("query", "") + " "
+                                 + rec.get("host", "") + " " + rec.get("reason", "")).lower():
                 continue
             out.append(rec)
             if len(out) >= limit:
