@@ -90,16 +90,50 @@ async function showApp() {
   $('gate').classList.add('hidden');
   $('app').classList.remove('hidden');
   startSession();                 // begin the idle-lock timer + heartbeats
-  await refreshState();
-  await refreshRules();
-  await refreshKeywords();
-  await refreshBypass();
-  await loadBundles();
-  await refreshSuggestions();
-  await refreshLearned();
-  await refreshLog();
-  await refreshHealth();
+  showPane('dashboard');          // land on the dashboard; each pane loads its data on open
 }
+
+// ── Sidebar navigation (load each pane's data on demand) ──────────────────────────
+const PANE_LOADERS = {
+  dashboard: refreshDashboard,
+  detection: refreshState,
+  rules: refreshRules,
+  keywords: refreshKeywords,
+  bypass: async () => { await refreshBypass(); await loadBundles(); await refreshSuggestions(); },
+  detected: refreshLearned,
+  activity: refreshLog,
+  diagnostics: refreshHealth,
+  settings: () => {},
+};
+function showPane(name) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.add('hidden'));
+  const pane = $('pane-' + name); if (pane) pane.classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.pane === name));
+  window.scrollTo(0, 0);
+  const load = PANE_LOADERS[name]; if (load) load();
+}
+$('sidebar').addEventListener('click', e => {
+  const b = e.target.closest('.nav-item'); if (b) showPane(b.dataset.pane);
+});
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────────
+async function refreshDashboard() {
+  await refreshState();                          // header status + stat numbers
+  const r = await api('GET', '/api/log?per_page=10&page=0&kind=activity');
+  const body = $('dash-log-body'); if (!body) return;
+  const rows = (r && r.log) || [];
+  body.innerHTML = '';
+  $('dash-log-empty').classList.toggle('hidden', rows.length > 0);
+  for (const e of rows) {
+    const tr = document.createElement('tr');
+    const act = e.action === 'blocked'
+      ? '<span class="tag block">blocked</span>' : '<span class="tag allow">allowed</span>';
+    tr.innerHTML = `<td>${esc((e.t || '').replace('T', ' '))}</td><td>${act}</td>` +
+      `<td class="url">${esc(e.url || e.host || '')}</td>`;
+    body.appendChild(tr);
+  }
+}
+$('dash-refresh').onclick = refreshDashboard;
 
 // ── Diagnostics ──────────────────────────────────────────────────────────────────
 async function refreshHealth() {
@@ -123,9 +157,14 @@ async function refreshState() {
   $('bypass-all').checked = s.bypassAll;
   $('bypass-warning').classList.toggle('hidden', !s.bypassAll);
   $('threshold').value = String(s.threshold);
-  $('summary').textContent = `${s.ruleCount} rules · ${s.keywordCount} keywords · ${s.learnedCount} learned`;
   $('proxy-status').textContent = s.proxyUp ? '🟢 filter active' : '🔴 filter down';
   $('filter-down-warning').classList.toggle('hidden', !s.failOpen);
+  if ($('dash-proxy')) {                          // dashboard stat cards
+    $('dash-proxy').textContent = s.proxyUp ? '🟢 Active' : '🔴 Down';
+    $('dash-rules').textContent = s.ruleCount;
+    $('dash-keywords').textContent = s.keywordCount;
+    $('dash-learned').textContent = s.learnedCount;
+  }
   const box = $('categories'); box.innerHTML = '';
   for (const c of s.categories || []) {
     const l = document.createElement('label');
