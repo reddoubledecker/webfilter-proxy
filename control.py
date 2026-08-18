@@ -9,9 +9,12 @@ import re
 import io
 import csv
 import json
+import time
+import datetime
 import functools
 import secrets
 import subprocess
+from collections import Counter
 
 from flask import Flask, request, session, jsonify, send_from_directory, Response
 
@@ -21,7 +24,9 @@ import categorize as C
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI_DIR = os.path.join(HERE, "ui")
 SECRET_PATH = os.path.join(HERE, "config", ".secret")
+EMERGENCY_MARKER = os.path.join(HERE, "config", "emergency")
 PORT = 8788
+IDLE_TIMEOUT = 60           # seconds of inactivity before the session auto-locks
 
 
 def _secret():
@@ -58,6 +63,19 @@ def require(fn):
     return wrapper
 
 
+@app.before_request
+def _idle_guard():
+    """Enforce the idle timeout server-side so it can't be bypassed by disabling JS.
+    Any non-GET request (a user action or the client heartbeat) counts as activity and
+    refreshes the clock; a session left idle past the timeout is cleared -> locked."""
+    if session.get("auth"):
+        now = time.time()
+        if now - session.get("last", now) > IDLE_TIMEOUT:
+            session.clear()
+        elif request.method != "GET":
+            session["last"] = now
+
+
 # ── static UI ────────────────────────────────────────────────────────────────────
 @app.get("/")
 def index():
@@ -73,12 +91,20 @@ def static_files(p):
 def login():
     if F.verify_password((request.json or {}).get("password", "")):
         session["auth"] = True
+        session["last"] = time.time()
         return jsonify(ok=True)
     return jsonify(ok=False, error="Incorrect password"), 401
 
 @app.post("/api/logout")
 def logout():
     session.clear()
+    return jsonify(ok=True)
+
+@app.post("/api/heartbeat")
+@require
+def heartbeat():
+    # The before_request hook refreshes the idle clock for this (non-GET) request; this
+    # just tells the client the session is still valid (or returns 401 once it's locked).
     return jsonify(ok=True)
 
 @app.get("/api/state")
@@ -90,8 +116,39 @@ def state():
     return jsonify(ok=True, hasPassword=F.has_password(), authed=authed(),
                    threshold=F.threshold(), safeSearch=F.safe_search_enabled(),
                    banner=F.banner_enabled(), bypassAll=F.bypass_all(),
-                   proxyUp=F.proxy_listening(), failOpen=F.is_failopen(), categories=cats,
+                   proxyUp=F.proxy_listening(), failOpen=F.is_failopen(),
+                   emergency=os.path.exists(EMERGENCY_MARKER), categories=cats,
                    ruleCount=len(F.RULES), keywordCount=len(F.KEYWORDS), learnedCount=len(F.LEARNED))
+
+@app.get("/api/summary")
+@require
+def summary():
+    """Aggregate stats for the dashboard: last-24h counts + top blocked over 7 days."""
+    cutoff = (datetime.datetime.now() - datetime.timedelta(hours=24)).isoformat()
+    reqs = blocked = searches = 0
+    for e in F.read_activity(limit=100000, days=1, kind="all", max_scan=120000):
+        if (e.get("t") or "") < cutoff:
+            continue
+        reqs += 1
+        if e.get("action") == "blocked":
+            blocked += 1
+        if e.get("query"):
+            searches += 1
+
+    dom, rsn = Counter(), Counter()
+    for e in F.read_activity(limit=100000, days=7, kind="blocked", max_scan=200000):
+        if e.get("host"):
+            dom[e["host"]] += 1
+        r = (e.get("reason") or "").strip()
+        if r:
+            rsn[r] += 1
+    top = lambda c: [{"name": k, "count": v} for k, v in c.most_common(5)]
+
+    return jsonify(ok=True, reqs24=reqs, blocked24=blocked, searches24=searches,
+                   topDomains=top(dom), topReasons=top(rsn),
+                   ruleCount=len(F.RULES), keywordCount=len(F.KEYWORDS),
+                   categoriesOn=sum(1 for c in C.CATEGORIES if F.category_enabled(c["id"])),
+                   bypassCount=len(F.bypass_entries()), learnedCount=len(F.LEARNED))
 
 # ── export / import config ───────────────────────────────────────────────────────
 @app.get("/api/export")
@@ -120,6 +177,7 @@ def password():
         return jsonify(ok=False, error="Password must be at least 4 characters"), 400
     F.set_password(nxt)
     session["auth"] = True
+    session["last"] = time.time()
     return jsonify(ok=True)
 
 
@@ -325,6 +383,32 @@ def set_bypassall():
         return jsonify(ok=False, error="Incorrect password"), 401
     F.save_config({"bypassAll": enabled})
     return jsonify(ok=True)
+
+
+# ── emergency bypass (kill switch: stop watchdog + unset the system proxy) ─────────
+def _run_script(name):
+    try:
+        p = subprocess.run(["/bin/bash", os.path.join(HERE, name)],
+                           capture_output=True, text=True, timeout=60)
+        return p.returncode == 0, (p.stdout or "") + (p.stderr or "")
+    except Exception as e:
+        return False, "Failed to run %s: %s" % (name, e)
+
+@app.post("/api/bypass/emergency")
+@require
+def bypass_emergency():
+    if F.has_password() and not F.verify_password((request.json or {}).get("password", "")):
+        return jsonify(ok=False, error="Incorrect password"), 401
+    ok, out = _run_script("emergency-off.sh")
+    return jsonify(ok=ok, output=out, error=None if ok else "Emergency bypass failed")
+
+@app.post("/api/bypass/restore")
+@require
+def bypass_restore():
+    if F.has_password() and not F.verify_password((request.json or {}).get("password", "")):
+        return jsonify(ok=False, error="Incorrect password"), 401
+    ok, out = _run_script("restore-filtering.sh")
+    return jsonify(ok=ok, output=out, error=None if ok else "Restore failed")
 
 
 # ── health / diagnostics ─────────────────────────────────────────────────────────

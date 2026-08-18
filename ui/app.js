@@ -52,21 +52,108 @@ $('login-btn').onclick = async () => {
   if (r.ok) { $('login-pw').value = ''; showApp(); } else $('login-err').textContent = r.error || 'Failed.';
 };
 $('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-btn').click(); });
-$('lock-btn').onclick = async () => { await api('POST', '/api/logout'); showGate('login'); };
+// ── Auto-lock: 1 min idle, and on closing the page ────────────────────────────────
+const IDLE_MS = 60000;         // lock after 1 minute with no interaction
+const HEARTBEAT_MS = 20000;    // while active, keep the server session alive (< idle timeout)
+let idleTimer = null, lastBeat = 0, sessionActive = false;
+
+async function lock(reason) {
+  if (!sessionActive) return;
+  sessionActive = false;
+  clearTimeout(idleTimer);
+  try { await api('POST', '/api/logout'); } catch (_) {}
+  showGate('login');
+  $('login-err').textContent = reason || '';
+}
+
+function bumpIdle() {
+  if (!sessionActive) return;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => lock('Locked after 1 minute of inactivity.'), IDLE_MS);
+  const now = Date.now();
+  if (now - lastBeat > HEARTBEAT_MS) {          // let the server know we're still here
+    lastBeat = now;
+    api('POST', '/api/heartbeat').then(r => { if (r && r.ok === false) lock('Session expired.'); });
+  }
+}
+
+function startSession() { sessionActive = true; lastBeat = Date.now(); bumpIdle(); }
+
+['mousemove', 'mousedown', 'keydown', 'scroll', 'wheel', 'touchstart'].forEach(
+  ev => window.addEventListener(ev, bumpIdle, { passive: true }));
+// Lock immediately when the page is closed / navigated away / refreshed.
+window.addEventListener('pagehide', () => { if (sessionActive) navigator.sendBeacon('/api/logout'); });
+
+$('lock-btn').onclick = () => lock();
 
 async function showApp() {
   $('gate').classList.add('hidden');
   $('app').classList.remove('hidden');
-  await refreshState();
-  await refreshRules();
-  await refreshKeywords();
-  await refreshBypass();
-  await loadBundles();
-  await refreshSuggestions();
-  await refreshLearned();
-  await refreshLog();
-  await refreshHealth();
+  startSession();                 // begin the idle-lock timer + heartbeats
+  showPane('dashboard');          // land on the dashboard; each pane loads its data on open
 }
+
+// ── Sidebar navigation (load each pane's data on demand) ──────────────────────────
+const PANE_LOADERS = {
+  dashboard: refreshDashboard,
+  filtering: () => showSub(currentSub),   // Filtering has its own sub-tabs
+  bypass: async () => { await refreshBypass(); await loadBundles(); await refreshSuggestions(); },
+  activity: refreshLog,
+  diagnostics: refreshHealth,
+  settings: () => {},
+};
+function showPane(name) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.add('hidden'));
+  const pane = $('pane-' + name); if (pane) pane.classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.pane === name));
+  window.scrollTo(0, 0);
+  const load = PANE_LOADERS[name]; if (load) load();
+}
+$('sidebar').addEventListener('click', e => {
+  const b = e.target.closest('.nav-item'); if (b) showPane(b.dataset.pane);
+});
+
+// Sub-tabs inside the Filtering pane (Detection · URL rules · Keywords · Detected).
+const SUB_LOADERS = { detection: refreshState, rules: refreshRules, keywords: refreshKeywords, detected: refreshLearned };
+let currentSub = 'detection';
+function showSub(name) {
+  currentSub = name;
+  document.querySelectorAll('#pane-filtering .subpane').forEach(p => p.classList.add('hidden'));
+  const sp = $('sub-' + name); if (sp) sp.classList.remove('hidden');
+  document.querySelectorAll('#filtering-subtabs .subtab').forEach(b => b.classList.toggle('active', b.dataset.sub === name));
+  const load = SUB_LOADERS[name]; if (load) load();
+}
+$('filtering-subtabs').addEventListener('click', e => {
+  const b = e.target.closest('.subtab'); if (b) showSub(b.dataset.sub);
+});
+
+// ── Dashboard (status + aggregate summary, not a feed) ────────────────────────────
+async function refreshDashboard() {
+  await refreshState();                          // header status + Filter stat card
+  const r = await api('GET', '/api/summary');
+  if (!r || !r.ok) return;
+  $('dash-blocked24').textContent = r.blocked24;
+  $('dash-reqs24').textContent = r.reqs24;
+  $('dash-searches24').textContent = r.searches24;
+  fillTop('dash-top-domains', 'dash-domains-empty', r.topDomains);
+  fillTop('dash-top-reasons', 'dash-reasons-empty', r.topReasons);
+  $('dash-inventory').textContent =
+    `${r.ruleCount} rules · ${r.keywordCount} keywords · ${r.categoriesOn} categories on · ` +
+    `${r.bypassCount} bypassed · ${r.learnedCount} auto-detected`;
+}
+function fillTop(bodyId, emptyId, items) {
+  const body = $(bodyId); if (!body) return;
+  items = items || [];
+  body.innerHTML = '';
+  $(emptyId).classList.toggle('hidden', items.length > 0);
+  for (const it of items) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="url">${esc(it.name)}</td>` +
+      `<td style="text-align:right;font-weight:600;width:60px">${it.count}</td>`;
+    body.appendChild(tr);
+  }
+}
+$('dash-refresh').onclick = refreshDashboard;
 
 // ── Diagnostics ──────────────────────────────────────────────────────────────────
 async function refreshHealth() {
@@ -90,9 +177,16 @@ async function refreshState() {
   $('bypass-all').checked = s.bypassAll;
   $('bypass-warning').classList.toggle('hidden', !s.bypassAll);
   $('threshold').value = String(s.threshold);
-  $('summary').textContent = `${s.ruleCount} rules · ${s.keywordCount} keywords · ${s.learnedCount} learned`;
-  $('proxy-status').textContent = s.proxyUp ? '🟢 filter active' : '🔴 filter down';
+  $('proxy-status').textContent = s.emergency ? '🟠 filtering OFF (emergency)'
+    : (s.proxyUp ? '🟢 filter active' : '🔴 filter down');
   $('filter-down-warning').classList.toggle('hidden', !s.failOpen);
+  if ($('emg-idle')) {                            // emergency-bypass buttons
+    $('emg-idle').classList.toggle('hidden', s.emergency);
+    $('emg-active').classList.toggle('hidden', !s.emergency);
+  }
+  if ($('dash-proxy')) {                          // dashboard Filter stat card
+    $('dash-proxy').textContent = s.emergency ? '🟠 OFF' : (s.proxyUp ? '🟢 Active' : '🔴 Down');
+  }
   const box = $('categories'); box.innerHTML = '';
   for (const c of s.categories || []) {
     const l = document.createElement('label');
@@ -111,6 +205,27 @@ $('bypass-all').onchange = async e => {
   } else {
     await api('POST', '/api/bypassall', { enabled: false });
   }
+  refreshState();
+};
+
+// ── Emergency bypass (kill switch) ────────────────────────────────────────────────
+$('emergency-off-btn').onclick = async () => {
+  if (!confirm('Turn OFF all filtering now?\n\nThis stops the watchdog and unsets the system proxy so browsing works unfiltered until you re-enable it.')) return;
+  const pw = await askPassword('Enter your password to turn filtering OFF (emergency)');
+  if (pw == null) return;
+  $('emergency-msg').textContent = 'Working…';
+  const r = await api('POST', '/api/bypass/emergency', { password: pw });
+  $('emergency-msg').textContent = '';
+  if (!r.ok) return alert(r.error || 'Failed.');
+  refreshState();
+};
+$('emergency-restore-btn').onclick = async () => {
+  const pw = await askPassword('Enter your password to re-enable filtering');
+  if (pw == null) return;
+  $('emergency-msg').textContent = 'Working…';
+  const r = await api('POST', '/api/bypass/restore', { password: pw });
+  $('emergency-msg').textContent = '';
+  if (!r.ok) return alert(r.error || 'Failed.');
   refreshState();
 };
 $('bypass-off').onclick = async () => { await api('POST', '/api/bypassall', { enabled: false }); refreshState(); };

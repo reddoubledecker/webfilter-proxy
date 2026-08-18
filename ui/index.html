@@ -42,151 +42,235 @@
       <h1>🛡️ Family Web Filter</h1>
       <div class="header-right">
         <span id="proxy-status" class="muted"></span>
-        <span id="summary" class="muted"></span>
         <button class="ghost small" id="theme-btn" title="Toggle dark mode">🌙</button>
         <button class="ghost small" id="lock-btn">Lock</button>
       </div>
     </header>
-    <main>
-      <section class="card">
-        <h2>Detection</h2>
-        <div class="row">
-          <label class="switch"><input type="checkbox" id="safesearch" /> <span>Force Safe Search</span></label>
-          <label class="switch"><input type="checkbox" id="banner" /> <span>“Monitored” banner on pages</span></label>
-          <div class="pause">
-            <span class="muted">Sensitivity</span>
-            <select id="threshold">
-              <option value="20">Maximum</option>
-              <option value="30">Very high</option>
-              <option value="40">High</option>
-              <option value="55">Medium</option>
-              <option value="70">Low</option>
-            </select>
+
+    <div class="layout">
+      <nav id="sidebar" class="sidebar">
+        <button class="nav-item active" data-pane="dashboard">📊 Dashboard</button>
+        <button class="nav-item" data-pane="filtering">🎯 Filtering</button>
+        <button class="nav-item" data-pane="bypass">↪️ Bypass</button>
+        <button class="nav-item" data-pane="activity">📜 Activity</button>
+        <button class="nav-item" data-pane="diagnostics">🩺 Diagnostics</button>
+        <button class="nav-item" data-pane="settings">⚙️ Settings</button>
+      </nav>
+
+      <main>
+        <!-- Dashboard -->
+        <div class="pane" id="pane-dashboard">
+          <div class="logs-head" style="margin-bottom:14px">
+            <h2 style="font-size:15px">Overview</h2>
+            <button class="ghost small" id="dash-refresh">Refresh</button>
+          </div>
+          <div class="stat-grid">
+            <div class="stat"><div class="stat-label">Filter</div><div class="stat-value" id="dash-proxy">—</div></div>
+            <div class="stat"><div class="stat-label">Blocked (24h)</div><div class="stat-value" id="dash-blocked24">—</div></div>
+            <div class="stat"><div class="stat-label">Requests (24h)</div><div class="stat-value" id="dash-reqs24">—</div></div>
+            <div class="stat"><div class="stat-label">Searches (24h)</div><div class="stat-value" id="dash-searches24">—</div></div>
+          </div>
+          <div class="summary-grid">
+            <section class="card">
+              <div class="logs-head"><h2>Top blocked sites</h2><span class="muted">last 7 days</span></div>
+              <table><tbody id="dash-top-domains"></tbody></table>
+              <p id="dash-domains-empty" class="muted hidden">Nothing blocked yet.</p>
+            </section>
+            <section class="card">
+              <div class="logs-head"><h2>Top block reasons</h2><span class="muted">last 7 days</span></div>
+              <table><tbody id="dash-top-reasons"></tbody></table>
+              <p id="dash-reasons-empty" class="muted hidden">Nothing blocked yet.</p>
+            </section>
+          </div>
+          <section class="card subtle">
+            <p class="muted" id="dash-inventory">—</p>
+          </section>
+        </div>
+
+        <!-- Filtering (Detection · URL rules · Keywords · Detected) -->
+        <div class="pane hidden" id="pane-filtering">
+          <div class="subtabs" id="filtering-subtabs">
+            <button class="subtab active" data-sub="detection">Detection</button>
+            <button class="subtab" data-sub="rules">URL rules</button>
+            <button class="subtab" data-sub="keywords">Keywords</button>
+            <button class="subtab" data-sub="detected">Detected</button>
+          </div>
+
+          <div class="subpane" id="sub-detection">
+            <section class="card">
+              <h2>Detection</h2>
+              <div class="row">
+                <label class="switch"><input type="checkbox" id="safesearch" /> <span>Force Safe Search</span></label>
+                <label class="switch"><input type="checkbox" id="banner" /> <span>“Monitored” banner on pages</span></label>
+                <div class="pause">
+                  <span class="muted">Sensitivity</span>
+                  <select id="threshold">
+                    <option value="20">Maximum</option>
+                    <option value="30">Very high</option>
+                    <option value="40">High</option>
+                    <option value="55">Medium</option>
+                    <option value="70">Low</option>
+                  </select>
+                </div>
+              </div>
+              <h3 class="subhead">Categories to block</h3>
+              <div id="categories" class="cat-grid"></div>
+              <div class="row" style="margin-top:14px">
+                <label class="switch"><input type="checkbox" id="bypass-all" /> <span>⚠️ Bypass all (testing) — no interception; traffic passes through untouched (not filtered or logged)</span></label>
+              </div>
+            </section>
+          </div>
+
+          <div class="subpane hidden" id="sub-rules">
+            <section class="card">
+              <h2>URL rules</h2>
+              <p class="muted">Most-specific pattern wins. Wildcards: <code>*games*</code>, <code>*.poki.com</code>, <code>site.com/play*</code>.</p>
+              <div class="add-row">
+                <select id="rule-type"><option value="block">Block</option><option value="allow">Allow</option></select>
+                <input type="text" id="rule-pattern" placeholder="e.g. badsite.com" />
+                <button class="primary" id="add-rule">Add</button>
+              </div>
+              <div class="err" id="rule-err"></div>
+              <table><thead><tr><th>Type</th><th class="sortable" id="rules-sort">Pattern ⇅</th><th></th></tr></thead><tbody id="rules-body"></tbody></table>
+              <p id="rules-empty" class="muted hidden">No rules yet.</p>
+            </section>
+          </div>
+
+          <div class="subpane hidden" id="sub-keywords">
+            <section class="card">
+              <div class="logs-head">
+                <h2>Blocked keywords</h2>
+                <div class="add-row" style="margin:0"><span id="kw-count" class="muted"></span><button class="ghost small" id="kw-toggle">Show</button></div>
+              </div>
+              <p class="muted">Hidden by default (keywords can be sensitive). One per line or comma-separated; matches URL substring + whole word in page content.</p>
+              <textarea id="kw-input" rows="3" placeholder="Add keywords…"></textarea>
+              <div class="add-row"><button class="primary" id="add-kw">Add</button><span id="kw-msg" class="muted"></span></div>
+              <div id="kw-list" class="kw-list blurred"></div>
+            </section>
+          </div>
+
+          <div class="subpane hidden" id="sub-detected">
+            <section class="card">
+              <div class="logs-head"><h2>Auto-detected domains</h2>
+                <div class="add-row" style="margin:0">
+                  <button class="ghost small" id="refresh-learned">Refresh</button>
+                  <button class="ghost small danger" id="clear-learned">Clear all</button>
+                </div>
+              </div>
+              <table><thead><tr><th>Domain</th><th>Category</th><th>Score</th><th></th></tr></thead><tbody id="learned-body"></tbody></table>
+              <p id="learned-empty" class="muted hidden">Nothing auto-detected yet.</p>
+            </section>
           </div>
         </div>
-        <h3 class="subhead">Categories to block</h3>
-        <div id="categories" class="cat-grid"></div>
-        <div class="row" style="margin-top:14px">
-          <label class="switch"><input type="checkbox" id="bypass-all" /> <span>⚠️ Bypass all (testing) — no interception; traffic passes through untouched (not filtered or logged)</span></label>
-        </div>
-      </section>
 
-      <section class="card">
-        <h2>URL rules</h2>
-        <p class="muted">Most-specific pattern wins. Wildcards: <code>*games*</code>, <code>*.poki.com</code>, <code>site.com/play*</code>.</p>
-        <div class="add-row">
-          <select id="rule-type"><option value="block">Block</option><option value="allow">Allow</option></select>
-          <input type="text" id="rule-pattern" placeholder="e.g. badsite.com" />
-          <button class="primary" id="add-rule">Add</button>
-        </div>
-        <div class="err" id="rule-err"></div>
-        <table><thead><tr><th>Type</th><th class="sortable" id="rules-sort">Pattern ⇅</th><th></th></tr></thead><tbody id="rules-body"></tbody></table>
-        <p id="rules-empty" class="muted hidden">No rules yet.</p>
-      </section>
+        <!-- Bypass -->
+        <div class="pane hidden" id="pane-bypass">
+          <section class="card">
+            <div class="logs-head"><h2>Bypass (no-intercept)</h2><span id="bypass-count" class="muted"></span></div>
+            <p class="muted">
+              Sites here are <b>passed through untouched</b> — not decrypted, filtered, or logged. Use for
+              cert-pinned sites/apps (banking, etc.) that break under inspection. Domain
+              (<code>bank.com</code> = + subdomains), keyword (<code>bank</code> = substring), or wildcard
+              (<code>*.apple.com</code>).
+            </p>
+            <textarea id="bypass-input" rows="2" placeholder="Add sites / keywords / wildcards…"></textarea>
+            <div class="add-row">
+              <input type="text" id="bypass-group" placeholder="Group (optional, e.g. Netflix)" style="max-width:220px" />
+              <button class="primary" id="add-bypass">Add</button>
+              <span class="muted">or a preset:</span>
+              <select id="bundle-select"></select>
+              <button class="ghost small" id="add-bundle">Add bundle</button>
+              <span id="bypass-msg" class="muted"></span>
+            </div>
+            <div id="bypass-list"></div>
+          </section>
 
-      <section class="card">
-        <div class="logs-head">
-          <h2>Blocked keywords</h2>
-          <div class="add-row" style="margin:0"><span id="kw-count" class="muted"></span><button class="ghost small" id="kw-toggle">Show</button></div>
+          <section class="card">
+            <div class="logs-head"><h2>Suggested related domains</h2><button class="ghost small" id="refresh-suggestions">Refresh</button></div>
+            <p class="muted">Domains your bypassed sites loaded content from (e.g. Netflix → nflxvideo.net). Add them to bypass so those sites work fully.</p>
+            <table><thead><tr><th>Domain</th><th>Seen from</th><th>Hits</th><th></th></tr></thead><tbody id="suggestions-body"></tbody></table>
+            <p id="suggestions-empty" class="muted hidden">No suggestions yet.</p>
+          </section>
         </div>
-        <p class="muted">Hidden by default (keywords can be sensitive). One per line or comma-separated; matches URL substring + whole word in page content.</p>
-        <textarea id="kw-input" rows="3" placeholder="Add keywords…"></textarea>
-        <div class="add-row"><button class="primary" id="add-kw">Add</button><span id="kw-msg" class="muted"></span></div>
-        <div id="kw-list" class="kw-list blurred"></div>
-      </section>
 
-      <section class="card">
-        <div class="logs-head"><h2>Bypass (no-intercept)</h2><span id="bypass-count" class="muted"></span></div>
-        <p class="muted">
-          Sites here are <b>passed through untouched</b> — not decrypted, filtered, or logged. Use for
-          cert-pinned sites/apps (banking, etc.) that break under inspection. Domain
-          (<code>bank.com</code> = + subdomains), keyword (<code>bank</code> = substring), or wildcard
-          (<code>*.apple.com</code>).
-        </p>
-        <textarea id="bypass-input" rows="2" placeholder="Add sites / keywords / wildcards…"></textarea>
-        <div class="add-row">
-          <input type="text" id="bypass-group" placeholder="Group (optional, e.g. Netflix)" style="max-width:220px" />
-          <button class="primary" id="add-bypass">Add</button>
-          <span class="muted">or a preset:</span>
-          <select id="bundle-select"></select>
-          <button class="ghost small" id="add-bundle">Add bundle</button>
-          <span id="bypass-msg" class="muted"></span>
+        <!-- Activity -->
+        <div class="pane hidden" id="pane-activity">
+          <section class="card">
+            <div class="logs-head">
+              <h2>Activity log</h2>
+              <div class="add-row" style="margin:0">
+                <select id="log-kind">
+                  <option value="activity">Pages &amp; searches</option>
+                  <option value="searches">Searches only</option>
+                  <option value="blocked">Blocked only</option>
+                  <option value="all">Everything</option>
+                </select>
+                <input type="text" id="log-q" placeholder="Filter…" />
+                <button class="ghost small" id="refresh-log">Refresh</button>
+                <button class="ghost small" id="export-csv">Export CSV</button>
+                <button class="ghost small danger" id="clear-log">Clear log</button>
+              </div>
+            </div>
+            <p class="muted">All traffic is logged (last 30 days shown). Google/Bing/DuckDuckGo/YouTube search terms are captured.</p>
+            <table><thead><tr><th>Time</th><th>Action</th><th>Search / Reason</th><th>URL</th></tr></thead><tbody id="log-body"></tbody></table>
+            <p id="log-empty" class="muted hidden">No activity logged yet.</p>
+            <div class="add-row" id="log-pager" style="justify-content:flex-end">
+              <button class="ghost small" id="log-prev">‹ Prev</button>
+              <span class="muted" id="log-page">Page 1</span>
+              <button class="ghost small" id="log-next">Next ›</button>
+            </div>
+          </section>
         </div>
-        <div id="bypass-list"></div>
-      </section>
 
-      <section class="card">
-        <div class="logs-head"><h2>Suggested related domains</h2><button class="ghost small" id="refresh-suggestions">Refresh</button></div>
-        <p class="muted">Domains your bypassed sites loaded content from (e.g. Netflix → nflxvideo.net). Add them to bypass so those sites work fully.</p>
-        <table><thead><tr><th>Domain</th><th>Seen from</th><th>Hits</th><th></th></tr></thead><tbody id="suggestions-body"></tbody></table>
-        <p id="suggestions-empty" class="muted hidden">No suggestions yet.</p>
-      </section>
-
-      <section class="card">
-        <div class="logs-head"><h2>Auto-detected domains</h2>
-          <div class="add-row" style="margin:0">
-            <button class="ghost small" id="refresh-learned">Refresh</button>
-            <button class="ghost small danger" id="clear-learned">Clear all</button>
-          </div>
+        <!-- Diagnostics -->
+        <div class="pane hidden" id="pane-diagnostics">
+          <section class="card">
+            <h2>Diagnostics</h2>
+            <p class="muted">Run a health check — it shows what's wrong and how to fix it. The watchdog also writes a diagnosis here automatically whenever the proxy goes down.</p>
+            <div class="add-row"><button class="ghost small" id="run-health">Run health check</button><span id="health-msg" class="muted"></span></div>
+            <pre id="health-out" class="diag"></pre>
+          </section>
         </div>
-        <table><thead><tr><th>Domain</th><th>Category</th><th>Score</th><th></th></tr></thead><tbody id="learned-body"></tbody></table>
-        <p id="learned-empty" class="muted hidden">Nothing auto-detected yet.</p>
-      </section>
 
-      <section class="card">
-        <div class="logs-head">
-          <h2>Activity log</h2>
-          <div class="add-row" style="margin:0">
-            <select id="log-kind">
-              <option value="activity">Pages &amp; searches</option>
-              <option value="searches">Searches only</option>
-              <option value="blocked">Blocked only</option>
-              <option value="all">Everything</option>
-            </select>
-            <input type="text" id="log-q" placeholder="Filter…" />
-            <button class="ghost small" id="refresh-log">Refresh</button>
-            <button class="ghost small" id="export-csv">Export CSV</button>
-            <button class="ghost small danger" id="clear-log">Clear log</button>
-          </div>
-        </div>
-        <p class="muted">All traffic is logged (last 30 days shown). Google/Bing/DuckDuckGo/YouTube search terms are captured.</p>
-        <table><thead><tr><th>Time</th><th>Action</th><th>Search / Reason</th><th>URL</th></tr></thead><tbody id="log-body"></tbody></table>
-        <p id="log-empty" class="muted hidden">No activity logged yet.</p>
-        <div class="add-row" id="log-pager" style="justify-content:flex-end">
-          <button class="ghost small" id="log-prev">‹ Prev</button>
-          <span class="muted" id="log-page">Page 1</span>
-          <button class="ghost small" id="log-next">Next ›</button>
-        </div>
-      </section>
+        <!-- Settings -->
+        <div class="pane hidden" id="pane-settings">
+          <section class="card">
+            <h2>Emergency bypass</h2>
+            <p class="muted">If the filter is broken and you just need internet to work, this turns filtering <b>off</b> — it stops the watchdog and unsets the system proxy so all traffic flows directly (no MITM). Re-enable once the problem is fixed.</p>
+            <div class="add-row" id="emg-idle">
+              <button class="ghost small danger" id="emergency-off-btn">Restore unfiltered internet</button>
+              <span id="emergency-msg" class="muted"></span>
+            </div>
+            <div class="add-row hidden" id="emg-active">
+              <span style="color:#dc2626;font-weight:600;font-size:13px">⚠️ Filtering is OFF (emergency bypass active).</span>
+              <button class="primary small" id="emergency-restore-btn">Re-enable filtering</button>
+            </div>
+          </section>
 
-      <section class="card">
-        <h2>Diagnostics</h2>
-        <p class="muted">Run a health check — it shows what's wrong and how to fix it. The watchdog also writes a diagnosis here automatically whenever the proxy goes down.</p>
-        <div class="add-row"><button class="ghost small" id="run-health">Run health check</button><span id="health-msg" class="muted"></span></div>
-        <pre id="health-out" class="diag"></pre>
-      </section>
+          <section class="card">
+            <h2>Backup / transfer</h2>
+            <p class="muted">Export your rules, keywords, categories, Safe Search, and bypass list to a file, then import it on another machine. The password is <b>not</b> included.</p>
+            <div class="add-row">
+              <button class="ghost small" id="export-btn">Export config</button>
+              <label class="ghost small" style="display:inline-flex;align-items:center;cursor:pointer;padding:6px 12px;border-radius:9px;font-weight:600;">Import config<input type="file" id="import-file" accept="application/json,.json" hidden /></label>
+              <span id="backup-msg" class="muted"></span>
+            </div>
+          </section>
 
-      <section class="card">
-        <h2>Backup / transfer</h2>
-        <p class="muted">Export your rules, keywords, categories, Safe Search, and bypass list to a file, then import it on another machine. The password is <b>not</b> included.</p>
-        <div class="add-row">
-          <button class="ghost small" id="export-btn">Export config</button>
-          <label class="ghost small" style="display:inline-flex;align-items:center;cursor:pointer;padding:6px 12px;border-radius:9px;font-weight:600;">Import config<input type="file" id="import-file" accept="application/json,.json" hidden /></label>
-          <span id="backup-msg" class="muted"></span>
+          <section class="card subtle">
+            <h2>Change password</h2>
+            <div class="err" id="pw-err"></div><div class="ok" id="pw-ok"></div>
+            <div class="add-row">
+              <input type="password" id="cur-pw" placeholder="Current password" />
+              <input type="password" id="new-pw" placeholder="New password" />
+              <button class="primary" id="change-pw">Update</button>
+            </div>
+          </section>
         </div>
-      </section>
-
-      <section class="card subtle">
-        <h2>Change password</h2>
-        <div class="err" id="pw-err"></div><div class="ok" id="pw-ok"></div>
-        <div class="add-row">
-          <input type="password" id="cur-pw" placeholder="Current password" />
-          <input type="password" id="new-pw" placeholder="New password" />
-          <button class="primary" id="change-pw">Update</button>
-        </div>
-      </section>
-    </main>
+      </main>
+    </div>
   </div>
+
   <!-- Password modal (masked) -->
   <div id="pw-modal" class="modal hidden">
     <div class="modal-card">
