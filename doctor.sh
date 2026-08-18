@@ -95,16 +95,17 @@ report() {
       "sudo networksetup -setsecurewebproxy \"Wi-Fi\" 127.0.0.1 $PORT ; and -setwebproxy the same"
   fi
 
-  # CA present + trusted
-  if [ -f "$CONFDIR/mitmproxy-ca-cert.pem" ]; then
-    if security find-certificate -c mitmproxy /Library/Keychains/System.keychain >/dev/null 2>&1; then
-      pass "mitmproxy CA present and trusted"
-    else
-      warn "CA present but not trusted in System keychain (HTTPS will error)" \
-        "sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $CONFDIR/mitmproxy-ca-cert.pem"
-    fi
-  else
+  # CA present + actually trusted as a root (verify the trust chain, not just presence)
+  CACERT="$CONFDIR/mitmproxy-ca-cert.pem"
+  FIXCA="sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $CACERT"
+  if [ ! -f "$CACERT" ]; then
     fail "mitmproxy CA missing" "sudo ./regenerate-ca.sh  (creates + trusts a fresh CA)"
+  elif security verify-cert -L -p basic -c "$CACERT" >/dev/null 2>&1; then
+    pass "mitmproxy CA is present and trusted as a root"
+  elif security find-certificate -c mitmproxy /Library/Keychains/System.keychain >/dev/null 2>&1; then
+    warn "CA is in the System keychain but NOT trusted as a root (HTTPS will error)" "$FIXCA"
+  else
+    warn "CA present on disk but not added to the System keychain (HTTPS will error)" "$FIXCA"
   fi
 
   # QUIC disabled (Chrome bypasses the proxy otherwise)
