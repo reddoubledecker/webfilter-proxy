@@ -50,11 +50,8 @@
     <div class="layout">
       <nav id="sidebar" class="sidebar">
         <button class="nav-item active" data-pane="dashboard">📊 Dashboard</button>
-        <button class="nav-item" data-pane="detection">🎯 Detection</button>
-        <button class="nav-item" data-pane="rules">🔗 URL rules</button>
-        <button class="nav-item" data-pane="keywords">🔤 Keywords</button>
+        <button class="nav-item" data-pane="filtering">🎯 Filtering</button>
         <button class="nav-item" data-pane="bypass">↪️ Bypass</button>
-        <button class="nav-item" data-pane="detected">🔍 Detected</button>
         <button class="nav-item" data-pane="activity">📜 Activity</button>
         <button class="nav-item" data-pane="diagnostics">🩺 Diagnostics</button>
         <button class="nav-item" data-pane="settings">⚙️ Settings</button>
@@ -77,60 +74,80 @@
           </section>
         </div>
 
-        <!-- Detection -->
-        <div class="pane hidden" id="pane-detection">
-          <section class="card">
-            <h2>Detection</h2>
-            <div class="row">
-              <label class="switch"><input type="checkbox" id="safesearch" /> <span>Force Safe Search</span></label>
-              <label class="switch"><input type="checkbox" id="banner" /> <span>“Monitored” banner on pages</span></label>
-              <div class="pause">
-                <span class="muted">Sensitivity</span>
-                <select id="threshold">
-                  <option value="20">Maximum</option>
-                  <option value="30">Very high</option>
-                  <option value="40">High</option>
-                  <option value="55">Medium</option>
-                  <option value="70">Low</option>
-                </select>
+        <!-- Filtering (Detection · URL rules · Keywords · Detected) -->
+        <div class="pane hidden" id="pane-filtering">
+          <div class="subtabs" id="filtering-subtabs">
+            <button class="subtab active" data-sub="detection">Detection</button>
+            <button class="subtab" data-sub="rules">URL rules</button>
+            <button class="subtab" data-sub="keywords">Keywords</button>
+            <button class="subtab" data-sub="detected">Detected</button>
+          </div>
+
+          <div class="subpane" id="sub-detection">
+            <section class="card">
+              <h2>Detection</h2>
+              <div class="row">
+                <label class="switch"><input type="checkbox" id="safesearch" /> <span>Force Safe Search</span></label>
+                <label class="switch"><input type="checkbox" id="banner" /> <span>“Monitored” banner on pages</span></label>
+                <div class="pause">
+                  <span class="muted">Sensitivity</span>
+                  <select id="threshold">
+                    <option value="20">Maximum</option>
+                    <option value="30">Very high</option>
+                    <option value="40">High</option>
+                    <option value="55">Medium</option>
+                    <option value="70">Low</option>
+                  </select>
+                </div>
               </div>
-            </div>
-            <h3 class="subhead">Categories to block</h3>
-            <div id="categories" class="cat-grid"></div>
-            <div class="row" style="margin-top:14px">
-              <label class="switch"><input type="checkbox" id="bypass-all" /> <span>⚠️ Bypass all (testing) — no interception; traffic passes through untouched (not filtered or logged)</span></label>
-            </div>
-          </section>
-        </div>
+              <h3 class="subhead">Categories to block</h3>
+              <div id="categories" class="cat-grid"></div>
+              <div class="row" style="margin-top:14px">
+                <label class="switch"><input type="checkbox" id="bypass-all" /> <span>⚠️ Bypass all (testing) — no interception; traffic passes through untouched (not filtered or logged)</span></label>
+              </div>
+            </section>
+          </div>
 
-        <!-- URL rules -->
-        <div class="pane hidden" id="pane-rules">
-          <section class="card">
-            <h2>URL rules</h2>
-            <p class="muted">Most-specific pattern wins. Wildcards: <code>*games*</code>, <code>*.poki.com</code>, <code>site.com/play*</code>.</p>
-            <div class="add-row">
-              <select id="rule-type"><option value="block">Block</option><option value="allow">Allow</option></select>
-              <input type="text" id="rule-pattern" placeholder="e.g. badsite.com" />
-              <button class="primary" id="add-rule">Add</button>
-            </div>
-            <div class="err" id="rule-err"></div>
-            <table><thead><tr><th>Type</th><th class="sortable" id="rules-sort">Pattern ⇅</th><th></th></tr></thead><tbody id="rules-body"></tbody></table>
-            <p id="rules-empty" class="muted hidden">No rules yet.</p>
-          </section>
-        </div>
+          <div class="subpane hidden" id="sub-rules">
+            <section class="card">
+              <h2>URL rules</h2>
+              <p class="muted">Most-specific pattern wins. Wildcards: <code>*games*</code>, <code>*.poki.com</code>, <code>site.com/play*</code>.</p>
+              <div class="add-row">
+                <select id="rule-type"><option value="block">Block</option><option value="allow">Allow</option></select>
+                <input type="text" id="rule-pattern" placeholder="e.g. badsite.com" />
+                <button class="primary" id="add-rule">Add</button>
+              </div>
+              <div class="err" id="rule-err"></div>
+              <table><thead><tr><th>Type</th><th class="sortable" id="rules-sort">Pattern ⇅</th><th></th></tr></thead><tbody id="rules-body"></tbody></table>
+              <p id="rules-empty" class="muted hidden">No rules yet.</p>
+            </section>
+          </div>
 
-        <!-- Keywords -->
-        <div class="pane hidden" id="pane-keywords">
-          <section class="card">
-            <div class="logs-head">
-              <h2>Blocked keywords</h2>
-              <div class="add-row" style="margin:0"><span id="kw-count" class="muted"></span><button class="ghost small" id="kw-toggle">Show</button></div>
-            </div>
-            <p class="muted">Hidden by default (keywords can be sensitive). One per line or comma-separated; matches URL substring + whole word in page content.</p>
-            <textarea id="kw-input" rows="3" placeholder="Add keywords…"></textarea>
-            <div class="add-row"><button class="primary" id="add-kw">Add</button><span id="kw-msg" class="muted"></span></div>
-            <div id="kw-list" class="kw-list blurred"></div>
-          </section>
+          <div class="subpane hidden" id="sub-keywords">
+            <section class="card">
+              <div class="logs-head">
+                <h2>Blocked keywords</h2>
+                <div class="add-row" style="margin:0"><span id="kw-count" class="muted"></span><button class="ghost small" id="kw-toggle">Show</button></div>
+              </div>
+              <p class="muted">Hidden by default (keywords can be sensitive). One per line or comma-separated; matches URL substring + whole word in page content.</p>
+              <textarea id="kw-input" rows="3" placeholder="Add keywords…"></textarea>
+              <div class="add-row"><button class="primary" id="add-kw">Add</button><span id="kw-msg" class="muted"></span></div>
+              <div id="kw-list" class="kw-list blurred"></div>
+            </section>
+          </div>
+
+          <div class="subpane hidden" id="sub-detected">
+            <section class="card">
+              <div class="logs-head"><h2>Auto-detected domains</h2>
+                <div class="add-row" style="margin:0">
+                  <button class="ghost small" id="refresh-learned">Refresh</button>
+                  <button class="ghost small danger" id="clear-learned">Clear all</button>
+                </div>
+              </div>
+              <table><thead><tr><th>Domain</th><th>Category</th><th>Score</th><th></th></tr></thead><tbody id="learned-body"></tbody></table>
+              <p id="learned-empty" class="muted hidden">Nothing auto-detected yet.</p>
+            </section>
+          </div>
         </div>
 
         <!-- Bypass -->
@@ -160,20 +177,6 @@
             <p class="muted">Domains your bypassed sites loaded content from (e.g. Netflix → nflxvideo.net). Add them to bypass so those sites work fully.</p>
             <table><thead><tr><th>Domain</th><th>Seen from</th><th>Hits</th><th></th></tr></thead><tbody id="suggestions-body"></tbody></table>
             <p id="suggestions-empty" class="muted hidden">No suggestions yet.</p>
-          </section>
-        </div>
-
-        <!-- Auto-detected -->
-        <div class="pane hidden" id="pane-detected">
-          <section class="card">
-            <div class="logs-head"><h2>Auto-detected domains</h2>
-              <div class="add-row" style="margin:0">
-                <button class="ghost small" id="refresh-learned">Refresh</button>
-                <button class="ghost small danger" id="clear-learned">Clear all</button>
-              </div>
-            </div>
-            <table><thead><tr><th>Domain</th><th>Category</th><th>Score</th><th></th></tr></thead><tbody id="learned-body"></tbody></table>
-            <p id="learned-empty" class="muted hidden">Nothing auto-detected yet.</p>
           </section>
         </div>
 

@@ -90,6 +90,10 @@ tr.group-row td { background: var(--bg); font-weight: 700; font-size: 12px; colo
 .stat { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 15px 18px; }
 .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; font-weight: 600; }
 .stat-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+.subtabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.subtab { background: transparent; color: var(--muted); font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.subtab:hover { color: var(--text); }
+.subtab.active { color: var(--text); border-bottom-color: var(--accent); }
 @media (max-width: 760px) {
   .layout { flex-direction: column; gap: 0; }
   .sidebar { top: 0; z-index: 9; width: auto; flex-direction: row; overflow-x: auto; gap: 4px; padding: 8px 12px; background: var(--header-bg); border-bottom: 1px solid var(--border); }

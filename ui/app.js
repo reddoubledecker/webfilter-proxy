@@ -96,11 +96,8 @@ async function showApp() {
 // ── Sidebar navigation (load each pane's data on demand) ──────────────────────────
 const PANE_LOADERS = {
   dashboard: refreshDashboard,
-  detection: refreshState,
-  rules: refreshRules,
-  keywords: refreshKeywords,
+  filtering: () => showSub(currentSub),   // Filtering has its own sub-tabs
   bypass: async () => { await refreshBypass(); await loadBundles(); await refreshSuggestions(); },
-  detected: refreshLearned,
   activity: refreshLog,
   diagnostics: refreshHealth,
   settings: () => {},
@@ -114,6 +111,20 @@ function showPane(name) {
 }
 $('sidebar').addEventListener('click', e => {
   const b = e.target.closest('.nav-item'); if (b) showPane(b.dataset.pane);
+});
+
+// Sub-tabs inside the Filtering pane (Detection · URL rules · Keywords · Detected).
+const SUB_LOADERS = { detection: refreshState, rules: refreshRules, keywords: refreshKeywords, detected: refreshLearned };
+let currentSub = 'detection';
+function showSub(name) {
+  currentSub = name;
+  document.querySelectorAll('#pane-filtering .subpane').forEach(p => p.classList.add('hidden'));
+  const sp = $('sub-' + name); if (sp) sp.classList.remove('hidden');
+  document.querySelectorAll('#filtering-subtabs .subtab').forEach(b => b.classList.toggle('active', b.dataset.sub === name));
+  const load = SUB_LOADERS[name]; if (load) load();
+}
+$('filtering-subtabs').addEventListener('click', e => {
+  const b = e.target.closest('.subtab'); if (b) showSub(b.dataset.sub);
 });
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────────
