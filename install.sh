@@ -57,6 +57,7 @@ cat > "$PROXY_PLIST" <<PLIST
   <key>ProgramArguments</key><array>
     <string>$VENV/bin/mitmdump</string><string>-s</string><string>$DIR/filter.py</string>
     <string>--set</string><string>confdir=$CONFDIR</string>
+    <string>--set</string><string>stream_large_bodies=1m</string>
     <string>--listen-host</string><string>127.0.0.1</string>
     <string>--listen-port</string><string>$PROXY_PORT</string><string>-q</string>
   </array>
