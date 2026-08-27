@@ -452,7 +452,12 @@ async function refreshLog() {
     const action = e.action === 'blocked'
       ? '<span class="tag block">Blocked</span>' : '<span class="tag allow">Allowed</span>';
     const mid = e.query ? `<span class="tag cat">🔍 ${esc(e.query)}</span>` : esc(e.reason || '');
-    tr.innerHTML = `<td>${esc(time)}</td><td>${action}</td><td>${mid}</td><td class="url">${esc(e.url || '')}</td>`;
+    const midText = e.query ? `🔍 ${e.query}` : (e.reason || '');
+    const url = e.url || '';
+    tr.innerHTML = `<td data-label="Time">${esc(time)}</td>` +
+      `<td data-label="Action">${action}</td>` +
+      `<td class="reason-cell" data-label="Reason" title="${esc(midText)}">${mid}</td>` +
+      `<td class="url" data-label="URL" title="${esc(url)}">${esc(url)}</td>`;
     body.appendChild(tr);
   }
   $('log-page').textContent = `Page ${logPage + 1}`;
