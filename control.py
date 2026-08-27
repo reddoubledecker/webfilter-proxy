@@ -25,6 +25,16 @@ UI_DIR = os.path.join(HERE, "ui")
 SECRET_PATH = os.path.join(HERE, "config", ".secret")
 EMERGENCY_MARKER = os.path.join(HERE, "config", "emergency")
 PORT = 8788
+
+
+def _app_version():
+    try:
+        with open(os.path.join(HERE, "VERSION")) as f:
+            return f.read().strip() or "unknown"
+    except OSError:
+        return "unknown"
+
+APP_VERSION = _app_version()
 IDLE_TIMEOUT = 60           # seconds of inactivity before the session auto-locks
 
 
@@ -112,7 +122,7 @@ def state():
     F.reload_learned()
     cats = [{"id": c["id"], "label": c["label"], "enabled": F.category_enabled(c["id"])}
             for c in C.CATEGORIES]
-    return jsonify(ok=True, hasPassword=F.has_password(), authed=authed(),
+    return jsonify(ok=True, version=APP_VERSION, hasPassword=F.has_password(), authed=authed(),
                    threshold=F.threshold(), safeSearch=F.safe_search_enabled(),
                    banner=F.banner_enabled(), bypassAll=F.bypass_all(),
                    proxyUp=F.proxy_listening(), failOpen=F.is_failopen(),

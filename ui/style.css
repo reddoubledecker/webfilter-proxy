@@ -109,6 +109,7 @@ tr.group-row td { background: var(--bg); font-weight: 700; font-size: 12px; colo
 .nav-item { text-align: left; background: transparent; color: var(--muted); font-weight: 600; font-size: 13px; padding: 9px 12px; border-radius: 9px; width: 100%; }
 .nav-item:hover { background: var(--hover); color: var(--text); }
 .nav-item.active { background: var(--ghost-bg); color: var(--text); }
+.nav-version { margin-top: auto; padding: 12px; font-size: 11px; letter-spacing: .3px; }
 .layout main { flex: 1; min-width: 0; max-width: 860px; margin: 0; padding: 20px 24px 60px; }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 18px; }
 .stat { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 15px 18px; }

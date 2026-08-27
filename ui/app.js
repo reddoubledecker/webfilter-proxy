@@ -201,6 +201,7 @@ async function refreshState() {
   $('bypass-all').checked = s.bypassAll;
   $('bypass-warning').classList.toggle('hidden', !s.bypassAll);
   $('threshold').value = String(s.threshold);
+  if (s.version && $('app-version')) $('app-version').textContent = 'v' + s.version;
   $('proxy-status').textContent = s.emergency ? '🟠 filtering OFF (emergency)'
     : (s.proxyUp ? '🟢 filter active' : '🔴 filter down');
   $('filter-down-warning').classList.toggle('hidden', !s.failOpen);
