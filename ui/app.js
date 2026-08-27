@@ -148,12 +148,29 @@ function fillTop(bodyId, emptyId, items) {
   $(emptyId).classList.toggle('hidden', items.length > 0);
   for (const it of items) {
     const tr = document.createElement('tr');
+    tr.className = 'clickable';
+    tr.dataset.q = it.name;                       // clicking filters the log to this entry
+    tr.title = 'View blocked entries for this';
     tr.innerHTML = `<td class="url">${esc(it.name)}</td>` +
       `<td style="text-align:right;font-weight:600;width:60px">${it.count}</td>`;
     body.appendChild(tr);
   }
 }
 $('dash-refresh').onclick = refreshDashboard;
+
+// Jump to the Activity log, pre-filtered by kind and/or search text.
+function goToActivity(kind, q) {
+  $('log-kind').value = kind;
+  $('log-q').value = q || '';
+  logPage = 0;
+  showPane('activity');                           // PANE_LOADERS.activity re-runs refreshLog
+}
+$('pane-dashboard').addEventListener('click', e => {
+  const stat = e.target.closest('.stat.clickable');
+  if (stat) return goToActivity(stat.dataset.kind, '');
+  const row = e.target.closest('#dash-top-domains tr, #dash-top-reasons tr');
+  if (row && row.dataset.q != null) return goToActivity('blocked', row.dataset.q);
+});
 
 // ── Diagnostics ──────────────────────────────────────────────────────────────────
 async function refreshHealth() {

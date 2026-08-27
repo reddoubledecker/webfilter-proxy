@@ -90,6 +90,9 @@ tr.group-row td { background: var(--bg); font-weight: 700; font-size: 12px; colo
 .stat { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 15px 18px; }
 .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; font-weight: 600; }
 .stat-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+.stat.clickable { cursor: pointer; transition: background .12s, border-color .12s; }
+.stat.clickable:hover { background: var(--hover); border-color: var(--border-strong); }
+tr.clickable { cursor: pointer; }
 .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
 @media (max-width: 640px) { .summary-grid { grid-template-columns: 1fr; } }
 .subtabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }

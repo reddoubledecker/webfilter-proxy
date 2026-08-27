@@ -42,30 +42,38 @@ sudo ./deploy.sh        # rsync code to /usr/local + restart both daemons
 keywords, password, learned domains, logs), the venv, or the CA.
 
 ## Manage everything in the UI
-Password-protected, at `http://127.0.0.1:8788`. **Dark mode** toggle in the header.
-- **Detection** — Safe Search toggle, **"monitored" banner** toggle, sensitivity, per-category
-  checklist. The banner is injected by the proxy into every page (minimised to a small pill,
-  bottom-right, by default; click to expand) so browsing shows a visible "monitored" notice.
-  A **⚠️ Bypass all (testing)** switch flips mitmproxy to **no-intercept for all traffic**
-  (nothing is decrypted, filtered, or logged — real certs everywhere); the admin UI shows a
-  prominent orange banner at the top while it's on.
-- **URL rules** — add/delete block & allow (most-specific-wins); **sortable by pattern**
-- **Blocked keywords** — add/remove (98 defaults preloaded); **hidden by default** (click
-  *Show*) since keywords can be sensitive
-- **Bypass (no-intercept)** — sites/domain-keywords/wildcards passed through untouched
-  (not decrypted, filtered, or logged) for cert-pinned sites/apps that break under the MITM.
-  Entries are **grouped by name** (e.g. a *Netflix* group holding `netflix.com`,
-  `nflxvideo.net`, …). One-click **preset bundles** add a service's domains under its group,
-  and **Suggested related domains** shows what your bypassed sites pulled content from so you
-  can add them (inheriting the parent's group).
-- **Auto-detected domains** — promote to a rule or delete (Clear all re-prompts for the password)
-- **Activity log** — **all** traffic (allowed + blocked), with **search terms** captured
+Password-protected, at `http://127.0.0.1:8788`. A left **sidebar** groups everything into
+**Dashboard · Filtering · Bypass · Activity · Diagnostics · Settings** — one area on screen at
+a time, no long scroll. **Dark mode** toggle in the header. The session **auto-locks after 1
+minute idle** and on closing the page (re-enter the password to return).
+
+- **Dashboard** — at-a-glance status and summary, not a feed: filter state, **Blocked /
+  Requests / Searches (last 24h)**, **Top blocked sites** and **top block reasons** (last 7
+  days), and a one-line inventory (rules / keywords / categories on / bypassed / auto-detected).
+- **Filtering** (sub-tabs):
+  - *Detection* — Safe Search toggle, **"monitored" banner** toggle, sensitivity, per-category
+    checklist. The banner is injected by the proxy into every page (minimised to a small pill,
+    bottom-right; click to expand). A **⚠️ Bypass all (testing)** switch flips mitmproxy to
+    **no-intercept for all traffic** (nothing decrypted, filtered, or logged — real certs
+    everywhere); a prominent orange banner shows while it's on.
+  - *URL rules* — add/delete block & allow (most-specific-wins); **sortable by pattern**.
+  - *Keywords* — add/remove (98 defaults preloaded); **hidden by default** (click *Show*) since
+    keywords can be sensitive.
+  - *Detected* — auto-detected domains; promote to a rule or delete (Clear all re-prompts for
+    the password).
+- **Bypass** — sites/domain-keywords/wildcards passed through untouched (not decrypted,
+  filtered, or logged) for cert-pinned sites/apps that break under the MITM. Entries are
+  **grouped by name** (e.g. a *Netflix* group holding `netflix.com`, `nflxvideo.net`, …).
+  One-click **preset bundles** add a service's domains, and **Suggested related domains** shows
+  what your bypassed sites pulled content from so you can add them (inheriting the parent's group).
+- **Activity** — **all** traffic (allowed + blocked), with **search terms** captured
   (Google/Bing/DuckDuckGo/YouTube). Filter by Pages &amp; searches / Searches / Blocked /
   Everything, plus text search, pagination (50/page), **CSV export**, and **Clear log**
   (re-enter the password to wipe it). Last 30 days shown.
-- **Backup / transfer** — **export** your config (rules, keywords, categories, Safe Search,
-  bypass) to a file and **import** it on another machine (import re-prompts for the password).
-  The password itself is not included in the export.
+- **Diagnostics** — run the health check in-browser and read the latest diagnosis (see below).
+- **Settings** — **Emergency bypass** (see below), **Backup / transfer** (export/import your
+  config — rules, keywords, categories, Safe Search, bypass; password *not* included), and
+  **Change password**.
 
 Changes apply **live** — the proxy hot-reloads `config/` (no restart needed).
 
@@ -135,8 +143,25 @@ heal itself:
   (fixes the `non-positive serial number` deprecation before a future `cryptography` upgrade
   turns it into a hard crash) and re-trusts it.
 
-If the proxy is ever down and you need internet *now*: `sudo networksetup -setsecurewebproxystate "Wi-Fi" off`
-(and `-setwebproxystate` off). The watchdog re-enables it when the proxy is healthy.
+## Emergency bypass (kill switch)
+
+If the filter breaks and you just need browsing to work, restore unfiltered internet in one
+step. It **stops the watchdog** (so it can't re-lock) and **unsets the system proxy** on every
+network service, so traffic flows directly with no MITM:
+
+- **From the UI** — Settings → **Emergency bypass** → *Restore unfiltered internet* (confirm +
+  password). A **Re-enable filtering** button appears while it's active, and the header/dashboard
+  show 🟠 *filtering OFF (emergency)*. This works even during an outage, because the installer
+  bypasses the proxy for `127.0.0.1`/`localhost`, so the control UI stays reachable.
+- **From the terminal** — the ultimate failsafe, works even if the UI daemon is down:
+  ```bash
+  sudo ./emergency-off.sh        # filtering OFF now, and it stays off
+  sudo ./restore-filtering.sh    # re-point the proxy + restart the watchdog
+  ```
+
+Both require the admin password (UI) or `sudo` (CLI) — consistent with the tamper model: this
+protects against the filtered user, not an administrator. `doctor.sh` reports when emergency
+bypass is active.
 
 ## Diagnosing problems
 
