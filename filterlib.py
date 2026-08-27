@@ -574,6 +574,55 @@ def read_activity(limit=500, days=RETAIN_DAYS, q="", kind="activity", max_scan=4
                 return out
     return out
 
+def activity_summary(max_scan=150000):
+    """Dashboard aggregates in ONE bounded pass over the log (newest-first): last-24h
+    counts + top blocked domains/reasons over 7 days. Replaces two full read_activity
+    scans, roughly halving the work on a busy log."""
+    import datetime
+    from collections import Counter
+    now = datetime.datetime.now().timestamp()
+    cut24 = now - 86400
+    cut7 = now - 7 * 86400
+    reqs24 = blocked24 = searches24 = 0
+    dom, rsn = Counter(), Counter()
+    scanned = 0
+    done = False
+    for path in _log_files_newest_first():
+        if done:
+            break
+        budget = max_scan - scanned
+        if budget <= 0:
+            break
+        for line in reversed(_tail(path, budget)):
+            scanned += 1
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            try:
+                ts = datetime.datetime.fromisoformat(rec.get("t", "")).timestamp()
+            except ValueError:
+                ts = None
+            if ts is not None and ts < cut7:
+                done = True                        # older than 7 days -> chronological end
+                break
+            blocked = rec.get("action") == "blocked"
+            if ts is None or ts >= cut24:
+                reqs24 += 1
+                if blocked:
+                    blocked24 += 1
+                if rec.get("query"):
+                    searches24 += 1
+            if blocked:
+                if rec.get("host"):
+                    dom[rec["host"]] += 1
+                r = (rec.get("reason") or "").strip()
+                if r:
+                    rsn[r] += 1
+    top = lambda c: [{"name": k, "count": v} for k, v in c.most_common(5)]
+    return {"reqs24": reqs24, "blocked24": blocked24, "searches24": searches24,
+            "topDomains": top(dom), "topReasons": top(rsn)}
+
 def clear_activity():
     """Wipe the activity log. Truncates the current file (the proxy writes in append mode,
     so its open handle keeps working from EOF=0) and removes rotated backups."""

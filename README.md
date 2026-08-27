@@ -35,11 +35,57 @@ The running copy lives at `/usr/local/webfilter-proxy` (outside the user home fo
 macOS blocks root services from reading). After editing the source, deploy in one step:
 
 ```bash
-sudo ./deploy.sh        # rsync code to /usr/local + restart both daemons
+sudo ./deploy.sh        # rsync code to /usr/local + restart both daemons + stamp the version
 ```
 
 `deploy.sh` syncs **code + UI only** — it never overwrites `config/` (your live rules,
 keywords, password, learned domains, logs), the venv, or the CA.
+
+### Upgrade another Mac to the latest version
+
+Each Mac keeps a **source checkout** in your home folder and deploys from it into the running
+copy at `/usr/local/webfilter-proxy`. Do the one-time setup once per machine, then the upgrade
+steps whenever you want the latest.
+
+**One-time setup** (only if there's no `~/webfilter-proxy-src` yet):
+
+```bash
+git clone https://github.com/reddoubledecker/webfilter-proxy.git ~/webfilter-proxy-src
+```
+
+**To upgrade** (most releases — code, UI, filtering logic):
+
+```bash
+cd ~/webfilter-proxy-src
+git pull                 # fetch the latest
+sudo ./deploy.sh         # push it into /usr/local + restart + stamp today's date
+```
+
+**If the release changed the installer or a daemon** (new proxy flags, a new background
+service — the release notes will say so), also run the full installer afterwards. It rebuilds
+the venv and regenerates the LaunchDaemons, which `deploy.sh` does not touch:
+
+```bash
+sudo /usr/local/webfilter-proxy/install.sh
+```
+
+> Run `install.sh` from `/usr/local/webfilter-proxy`, **not** from the home checkout — the
+> daemons and venv are pinned to wherever it runs, and only `/usr/local` is readable by root
+> (macOS TCC). `install.sh` is safe to re-run; it preserves your `config/` and CA.
+
+**Verify the upgrade:**
+
+```bash
+sudo /usr/local/webfilter-proxy/doctor.sh   # everything should read [ OK ]
+```
+
+and open the control UI (`http://127.0.0.1:8788`) — the version at the bottom of the sidebar
+should show today's date (e.g. `v1.0.20260827`). No internet after the upgrade? See
+**Diagnosing problems** below.
+
+> No Git on that Mac? Download the ZIP from the repo's green **Code → Download ZIP** button,
+> unzip it to `~/webfilter-proxy-src` (replacing the old one), then run the same `deploy.sh` /
+> `install.sh` steps.
 
 ## Manage everything in the UI
 Password-protected, at `http://127.0.0.1:8788`. A left **sidebar** groups everything into

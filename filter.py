@@ -27,6 +27,7 @@ import filterlib as F
 import categorize as C
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+SCAN_CAP = 300_000        # only scan the first ~300 KB of an HTML body (bounds CPU per page)
 
 # ── Rotating activity log (all traffic, 100 MB rotation, 30-day retention) ────────
 _alog = logging.getLogger("wf.activity")
@@ -237,11 +238,15 @@ class WebFilter:
 
         # Content checks (only if not already decided, and not in bypass-all testing mode).
         if text and not flow.metadata.get("wf_blocked") and not flow.metadata.get("wf_allow") and not F.bypass_all():
-            status, reason = F.evaluate_content(text)
+            # Cap the text we scan: category signals live in the head/early body (title,
+            # meta, headings, first text), so a prefix is enough — and it bounds the regex
+            # cost so a huge page can't stall a low-spec CPU on every load.
+            scan = text if len(text) <= SCAN_CAP else text[:SCAN_CAP]
+            status, reason = F.evaluate_content(scan)
             if status == "block":
                 self._block_response(flow, reason)
             else:
-                hit = F.top_blockable(C.score_signals(C.extract_signals(text, flow.request.pretty_url)))
+                hit = F.top_blockable(C.score_signals(C.extract_signals(scan, flow.request.pretty_url)))
                 if hit:
                     F.add_learned(flow.request.host, hit["category"], hit["label"], hit["score"])
                     self._block_response(flow, "Auto-detected: " + hit["label"])

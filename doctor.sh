@@ -22,6 +22,14 @@ s=socket.socket(); s.settimeout(1)
 try: s.connect(('127.0.0.1',int(sys.argv[1]))); sys.exit(0)
 except Exception: sys.exit(1)" "$1" 2>/dev/null; }
 
+serves() {   # proxy port is not just open but actually answers an HTTP request (catches a wedged proxy)
+  /usr/bin/python3 -c "import socket,sys
+try:
+    s=socket.create_connection(('127.0.0.1',int(sys.argv[1])),timeout=8); s.settimeout(8)
+    s.sendall(('GET http://127.0.0.1:%s/ HTTP/1.1\r\nHost: 127.0.0.1:%s\r\nProxy-Connection: close\r\nConnection: close\r\n\r\n'%(sys.argv[2],sys.argv[2])).encode())
+    sys.exit(0 if s.recv(16)[:5]==b'HTTP/' else 1)
+except Exception: sys.exit(1)" "$1" "$UI_PORT" 2>/dev/null; }
+
 classify_proxy_error() {   # reads the tail of proxy.err.log and suggests the likely fix
   local t; t=$(tail -40 "$PROXY_ERR" 2>/dev/null)
   case "$t" in
@@ -60,11 +68,13 @@ report() {
     fail "Dependencies missing" "cd $DIR && sudo ./install.sh  (reinstalls requirements)"
   fi
 
-  # Proxy listening
-  if listening "$PORT"; then
-    pass "Proxy is listening on 127.0.0.1:$PORT"
-  else
+  # Proxy listening AND serving (a wedged proxy is listening but won't answer)
+  if ! listening "$PORT"; then
     fail "Proxy is NOT listening on $PORT" "$(classify_proxy_error) | then: sudo launchctl kickstart -k system/com.familywebfilter.proxy"
+  elif serves "$PORT"; then
+    pass "Proxy is listening and serving on 127.0.0.1:$PORT"
+  else
+    fail "Proxy is listening but NOT responding (wedged)" "Restart it: sudo launchctl kickstart -k system/com.familywebfilter.proxy  (the watchdog now auto-restarts this too)"
   fi
 
   # Control UI listening

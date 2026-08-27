@@ -15,6 +15,14 @@ PROXY_PLIST=/Library/LaunchDaemons/com.familywebfilter.proxy.plist
 [ "$SRC" != "$DEST" ] || { echo "Run this from your SOURCE copy, not $DEST." >&2; exit 1; }
 [ -f "$PROXY_PLIST" ] || { echo "Not installed yet. Run install.sh at $DEST first (see README)." >&2; exit 1; }
 
+# Stamp today's date into the patch field, keeping the hand-set major.minor (e.g. 1.0).
+# You only ever edit the "1.0" prefix in VERSION; the date updates automatically here.
+if [ -f "$SRC/VERSION" ]; then
+  base="$(cut -d. -f1,2 < "$SRC/VERSION")"
+  printf '%s.%s\n' "$base" "$(date +%Y%m%d)" > "$SRC/VERSION"
+  echo "Version stamped: $(cat "$SRC/VERSION")"
+fi
+
 echo "Syncing code to $DEST (config/, venv/, mitm-ca/ preserved)..."
 rsync -a --delete \
   --exclude venv --exclude mitm-ca --exclude '__pycache__' --exclude config \

@@ -128,6 +128,7 @@ $('filtering-subtabs').addEventListener('click', e => {
 });
 
 // ── Dashboard (status + aggregate summary, not a feed) ────────────────────────────
+let dashStaleTimer = null;
 async function refreshDashboard() {
   await refreshState();                          // header status + Filter stat card
   const r = await api('GET', '/api/summary');
@@ -140,6 +141,12 @@ async function refreshDashboard() {
   $('dash-inventory').textContent =
     `${r.ruleCount} rules · ${r.keywordCount} keywords · ${r.categoriesOn} categories on · ` +
     `${r.bypassCount} bypassed · ${r.learnedCount} auto-detected`;
+  // Served from a stale cache -> a background refresh is running; re-fetch once it lands so
+  // the numbers become current without making this load wait for the log scan.
+  clearTimeout(dashStaleTimer);
+  if (r.stale && !$('pane-dashboard').classList.contains('hidden')) {
+    dashStaleTimer = setTimeout(refreshDashboard, 3000);
+  }
 }
 function fillTop(bodyId, emptyId, items) {
   const body = $(bodyId); if (!body) return;
@@ -194,6 +201,7 @@ async function refreshState() {
   $('bypass-all').checked = s.bypassAll;
   $('bypass-warning').classList.toggle('hidden', !s.bypassAll);
   $('threshold').value = String(s.threshold);
+  if (s.version && $('app-version')) $('app-version').textContent = 'v' + s.version;
   $('proxy-status').textContent = s.emergency ? '🟠 filtering OFF (emergency)'
     : (s.proxyUp ? '🟢 filter active' : '🔴 filter down');
   $('filter-down-warning').classList.toggle('hidden', !s.failOpen);
@@ -445,7 +453,12 @@ async function refreshLog() {
     const action = e.action === 'blocked'
       ? '<span class="tag block">Blocked</span>' : '<span class="tag allow">Allowed</span>';
     const mid = e.query ? `<span class="tag cat">🔍 ${esc(e.query)}</span>` : esc(e.reason || '');
-    tr.innerHTML = `<td>${esc(time)}</td><td>${action}</td><td>${mid}</td><td class="url">${esc(e.url || '')}</td>`;
+    const midText = e.query ? `🔍 ${e.query}` : (e.reason || '');
+    const url = e.url || '';
+    tr.innerHTML = `<td data-label="Time">${esc(time)}</td>` +
+      `<td data-label="Action">${action}</td>` +
+      `<td class="reason-cell" data-label="Reason" title="${esc(midText)}">${mid}</td>` +
+      `<td class="url" data-label="URL" title="${esc(url)}">${esc(url)}</td>`;
     body.appendChild(tr);
   }
   $('log-page').textContent = `Page ${logPage + 1}`;

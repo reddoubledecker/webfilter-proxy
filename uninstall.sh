@@ -16,7 +16,7 @@ for pl in "$WATCHDOG_PLIST" "$PROXY_PLIST" "$UI_PLIST"; do
   launchctl unload -w "$pl" 2>/dev/null || true
   rm -f "$pl"
 done
-rm -f /usr/local/webfilter-proxy/config/watchdog.failopen /usr/local/webfilter-proxy/config/watchdog.fails 2>/dev/null || true
+rm -f /usr/local/webfilter-proxy/config/watchdog.failopen /usr/local/webfilter-proxy/config/watchdog.fails /usr/local/webfilter-proxy/config/watchdog.wedged 2>/dev/null || true
 
 echo "Unsetting system proxy..."
 while IFS= read -r svc; do
