@@ -10,11 +10,10 @@ import io
 import csv
 import json
 import time
-import datetime
+import threading
 import functools
 import secrets
 import subprocess
-from collections import Counter
 
 from flask import Flask, request, session, jsonify, send_from_directory, Response
 
@@ -120,32 +119,61 @@ def state():
                    emergency=os.path.exists(EMERGENCY_MARKER), categories=cats,
                    ruleCount=len(F.RULES), keywordCount=len(F.KEYWORDS), learnedCount=len(F.LEARNED))
 
+# The activity aggregation is the expensive part (it scans the log), so it's cached to a
+# file with a short TTL and served stale-while-revalidate: a returning dashboard gets the
+# last result instantly and a background thread refreshes it. Inventory counts are cheap,
+# so they're always computed live.
+SUMMARY_CACHE = os.path.join(HERE, "config", "summary.cache.json")
+SUMMARY_TTL = 120
+_summary_lock = threading.Lock()
+_summary_refreshing = False
+
+def _compute_activity_summary():
+    data = F.activity_summary()
+    try:
+        with open(SUMMARY_CACHE, "w") as f:
+            json.dump({"ts": time.time(), "data": data}, f)
+    except OSError:
+        pass
+    return data
+
+def _bg_refresh_summary():
+    global _summary_refreshing
+    with _summary_lock:
+        if _summary_refreshing:
+            return
+        _summary_refreshing = True
+    def run():
+        global _summary_refreshing
+        try:
+            _compute_activity_summary()
+        finally:
+            with _summary_lock:
+                _summary_refreshing = False
+    threading.Thread(target=run, daemon=True).start()
+
+def _activity_summary_cached():
+    """Returns (data, stale). stale=True means a background refresh was kicked off, so the
+    client should re-fetch shortly to get the fresh numbers."""
+    try:
+        with open(SUMMARY_CACHE) as f:
+            c = json.load(f)
+        data, age = c.get("data"), time.time() - c.get("ts", 0)
+    except (OSError, ValueError):
+        data, age = None, None
+    if data is not None and age is not None and age < SUMMARY_TTL:
+        return data, False                         # fresh
+    if data is not None:
+        _bg_refresh_summary()                      # stale: serve now, refresh in background
+        return data, True
+    return _compute_activity_summary(), False      # nothing cached: compute once, synchronously
+
 @app.get("/api/summary")
 @require
 def summary():
-    """Aggregate stats for the dashboard: last-24h counts + top blocked over 7 days."""
-    cutoff = (datetime.datetime.now() - datetime.timedelta(hours=24)).isoformat()
-    reqs = blocked = searches = 0
-    for e in F.read_activity(limit=100000, days=1, kind="all", max_scan=120000):
-        if (e.get("t") or "") < cutoff:
-            continue
-        reqs += 1
-        if e.get("action") == "blocked":
-            blocked += 1
-        if e.get("query"):
-            searches += 1
-
-    dom, rsn = Counter(), Counter()
-    for e in F.read_activity(limit=100000, days=7, kind="blocked", max_scan=200000):
-        if e.get("host"):
-            dom[e["host"]] += 1
-        r = (e.get("reason") or "").strip()
-        if r:
-            rsn[r] += 1
-    top = lambda c: [{"name": k, "count": v} for k, v in c.most_common(5)]
-
-    return jsonify(ok=True, reqs24=reqs, blocked24=blocked, searches24=searches,
-                   topDomains=top(dom), topReasons=top(rsn),
+    """Dashboard stats: cached last-24h counts + top blocked (7d), plus live inventory."""
+    act, stale = _activity_summary_cached()
+    return jsonify(ok=True, stale=stale, **act,
                    ruleCount=len(F.RULES), keywordCount=len(F.KEYWORDS),
                    categoriesOn=sum(1 for c in C.CATEGORIES if F.category_enabled(c["id"])),
                    bypassCount=len(F.bypass_entries()), learnedCount=len(F.LEARNED))

@@ -128,6 +128,7 @@ $('filtering-subtabs').addEventListener('click', e => {
 });
 
 // ── Dashboard (status + aggregate summary, not a feed) ────────────────────────────
+let dashStaleTimer = null;
 async function refreshDashboard() {
   await refreshState();                          // header status + Filter stat card
   const r = await api('GET', '/api/summary');
@@ -140,6 +141,12 @@ async function refreshDashboard() {
   $('dash-inventory').textContent =
     `${r.ruleCount} rules · ${r.keywordCount} keywords · ${r.categoriesOn} categories on · ` +
     `${r.bypassCount} bypassed · ${r.learnedCount} auto-detected`;
+  // Served from a stale cache -> a background refresh is running; re-fetch once it lands so
+  // the numbers become current without making this load wait for the log scan.
+  clearTimeout(dashStaleTimer);
+  if (r.stale && !$('pane-dashboard').classList.contains('hidden')) {
+    dashStaleTimer = setTimeout(refreshDashboard, 3000);
+  }
 }
 function fillTop(bodyId, emptyId, items) {
   const body = $(bodyId); if (!body) return;
